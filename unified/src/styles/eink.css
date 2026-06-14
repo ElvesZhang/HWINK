@@ -1,0 +1,88 @@
+/* ============================================================================
+   eink.css — 墨水屏「抖动 / 半调」实验工具层（sandbox 用）
+   ----------------------------------------------------------------------------
+   底色保留 #838383（品牌灰）。这一层提供：
+   1) 一组 1-bit 有序抖动(Bayer)色阶瓦片（向黑 ink-* / 向白 paper-*），整数像素、
+      image-rendering:pixelated，叠在任意背景上只是「加点」。
+   2) 全局抖动叠加层（.eink-grain / .eink-engrave）：用 mix-blend-mode 把半调纹理
+      叠到当前画面之上——黑区被白点「雕刻」出质感，灰区被黑点「纸纹」化。
+      一个开关即可全局加 / 去抖动，无需改动各个变体。
+   3) 真 1-bit 预览滤镜 .bit-preview：把画面硬阈值量化成纯黑白，验证抖动是否立得住。
+   ========================================================================== */
+
+/* ---------- 像素锐化 ---------- */
+.eink-crisp,
+.ink-12, .ink-25, .ink-50, .ink-75,
+.paper-12, .paper-25, .paper-50,
+.halftone-hero,
+.eink-grain, .eink-engrave {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---------- 向黑（黑点）：阴影 / 分区 / 压暗 ---------- */
+.ink-12 { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='2'%20fill='black'/%3E%3C/svg%3E"); background-repeat: repeat; }
+.ink-25 { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='2'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='2'%20fill='black'/%3E%3C/svg%3E"); background-repeat: repeat; }
+.ink-50 { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='2'%20height='2'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='1'%20y='1'%20fill='black'/%3E%3C/svg%3E"); background-repeat: repeat; }
+.ink-75 { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='4'%20height='1'%20x='0'%20y='1'%20fill='black'/%3E%3Crect%20width='4'%20height='1'%20x='0'%20y='3'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='1'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='3'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='1'%20y='2'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='3'%20y='2'%20fill='black'/%3E%3C/svg%3E"); background-repeat: repeat; }
+
+/* ---------- 向白（白点）：高光 / 强调 / 提亮 ---------- */
+.paper-12 { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='white'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='2'%20fill='white'/%3E%3C/svg%3E"); background-repeat: repeat; }
+.paper-25 { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='white'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='0'%20fill='white'/%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='2'%20fill='white'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='2'%20fill='white'/%3E%3C/svg%3E"); background-repeat: repeat; }
+.paper-50 { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='2'%20height='2'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='white'/%3E%3Crect%20width='1'%20height='1'%20x='1'%20y='1'%20fill='white'/%3E%3C/svg%3E"); background-repeat: repeat; }
+
+/* ---------- 半调渐变 hero（自上而下加深） ---------- */
+.halftone-hero {
+  background-color: transparent;
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='2'%20fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='2'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='2'%20fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='2'%20height='2'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='1'%20y='1'%20fill='black'/%3E%3C/svg%3E");
+  background-repeat: repeat-x, repeat-x, repeat-x;
+  background-position: top, center, bottom;
+  background-size: 100% 34%, 100% 33%, 100% 33%;
+}
+
+/* ============================================================================
+   全局抖动叠加（由 SandboxPage 的 .eink-dither 容器驱动）
+   ----------------------------------------------------------------------------
+   教训：把细抖动「铺满整屏」会变成噪点 / 网格摩尔纹、且压低对比。所以改为「有的放矢」：
+   - .eink-grain ：一层 multiply 的半调「暗角」叠层，只在四周成像（中心干净）→ 景深 / 框感。
+   - .eink-dither .bg-black ：只给「黑色块面」叠白点半调 → 黑 hero 变成「雕刻 / 炭黑」质感。
+     灰底完全不动，保持清爽，避免整屏噪点。
+   ========================================================================== */
+
+/* 半调暗角：multiply，仅最外圈成像（径向遮罩中心大面积透明），制造景深与框感 */
+.eink-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='2'%20height='2'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='black'/%3E%3Crect%20width='1'%20height='1'%20x='1'%20y='1'%20fill='black'/%3E%3C/svg%3E");
+  -webkit-mask-image: radial-gradient(135% 108% at 50% 45%, transparent 80%, #000 100%);
+          mask-image: radial-gradient(135% 108% at 50% 45%, transparent 80%, #000 100%);
+}
+
+/* 黑色块面雕刻：只对 .bg-black 后代叠「12% 稀疏白点」半调——给黑 hero 一点炭黑质感，
+   但保持其上白字 / 图标可读（密度低）。:where() 保持 0 特异度，不影响灰底 / 描边 / 文字。 */
+.eink-dither :where(.bg-black) {
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='4'%20height='4'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20x='0'%20y='0'%20fill='white'/%3E%3Crect%20width='1'%20height='1'%20x='2'%20y='2'%20fill='white'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---------- 真 1-bit 预览（硬阈值量化） ---------- */
+.bit-preview { filter: url(#eink-1bit); }
+
+/* ---------- 硬偏移阴影（墨水屏安全：纯黑实体、零模糊、零透明） ----------
+   软/模糊阴影是 alpha 渐变，双色屏会抖成噪点，不用；硬偏移阴影量化后仍是纯黑。 */
+.hard-shadow    { box-shadow: 6px 6px 0 0 #000; }
+.hard-shadow-sm { box-shadow: 4px 4px 0 0 #000; }
+
+/* ---------- 手绘风：不对称圆角做"歪框" + .sketch-rough 抖手滤镜 ---------- */
+.sketch-box   { border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; }
+.sketch-box-2 { border-radius: 15px 225px 15px 255px / 255px 15px 225px 15px; }
+.sketch-box-3 { border-radius: 210px 18px 240px 16px / 18px 220px 14px 235px; }
+.sketch-rough { filter: url(#sketch-rough); }
