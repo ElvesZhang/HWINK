@@ -18,9 +18,12 @@ interface FingerprintVerifyPageProps {
   /** Header title — defaults to the signing flow's wording; the Passkey flow
    *  passes its own (FIDO2 user verification). */
   title?: string;
+  /** Body prompt under "Verify Fingerprint" — defaults to the signing wording.
+   *  Firmware Update passes an update-specific line. */
+  promptSubtitle?: string;
 }
 
-export function FingerprintVerifyPage({ onBack, onVerifySuccess, showDebugId, title = 'Verify to Sign' }: FingerprintVerifyPageProps) {
+export function FingerprintVerifyPage({ onBack, onVerifySuccess, showDebugId, title = 'Verify to Sign', promptSubtitle = 'Touch the sensor to sign this request' }: FingerprintVerifyPageProps) {
   const [state, setState] = useState<'prompt' | 'scanning'>('prompt');
   const timer = useRef<number | null>(null);
 
@@ -63,7 +66,7 @@ export function FingerprintVerifyPage({ onBack, onVerifySuccess, showDebugId, ti
           {scanning ? 'Verifying…' : 'Verify Fingerprint'}
         </div>
         <div className="text-lg font-bold text-black mt-2 leading-snug">
-          {scanning ? 'Keep your finger on the sensor' : 'Touch the sensor to sign this request'}
+          {scanning ? 'Keep your finger on the sensor' : promptSubtitle}
         </div>
       </div>
     </div>

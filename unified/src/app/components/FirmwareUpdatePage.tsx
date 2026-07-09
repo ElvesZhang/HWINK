@@ -4,10 +4,19 @@ import {
   Smartphone, ArrowDown, RotateCw, ShieldCheck,
 } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
+import { FingerprintVerifyPage } from './FingerprintVerifyPage';
+import { ChangePINPage } from './ChangePINPage';
 
 interface FirmwareUpdatePageProps {
   onBack: () => void;
   showDebugId?: boolean;
+  /** Device has a fingerprint enrolled? Drives the second factor on "Update"
+   *  (fingerprint scan vs PIN keypad) — same rule as the Sign confirm. */
+  fingerprintEnrolled?: boolean;
+  /** Prototype sim: did the version check find a newer firmware? */
+  simulateHasUpdate?: boolean;
+  /** Prototype sim: does the on-Continue battery check pass? */
+  simulateBatteryOk?: boolean;
 }
 
 // ── Bluetooth firmware-update flow (device-side screens) ──
@@ -16,13 +25,14 @@ interface FirmwareUpdatePageProps {
 // states for those phases, then owns the security-critical bits: confirming
 // what it's about to receive, verifying the signature, and rebooting.
 //
-//   preflight → connect → checking → (up-to-date | confirm)
-//   confirm → transferring → installing → restarting → success
-//   failures: failed-connect | failed-transfer | failed-verify
+//   preflight → (battery-low | connect)
+//   connect → checking → (up-to-date | confirm)
+//   confirm → verify (PIN/fingerprint) → transferring → installing → restarting → success
+//   failures: battery-low | failed-connect | failed-transfer | failed-verify
 type UpdateStep =
-  | 'preflight' | 'connect' | 'checking'
+  | 'preflight' | 'battery-low' | 'connect' | 'checking'
   | 'up-to-date'
-  | 'confirm'
+  | 'confirm' | 'verify'
   | 'transferring' | 'installing' | 'restarting' | 'success'
   | 'failed-connect' | 'failed-transfer' | 'failed-verify';
 
@@ -45,15 +55,22 @@ const WHATS_NEW = [
 ];
 const WN_PER_PAGE = 4;
 
-// ── Prototype simulation switches (flip to preview alternate branches) ──
-const SIMULATE_HAS_UPDATE = true;                  // false → "up to date" branch
+// ── Prototype simulation switches ──
+// "Has update" and "battery ok" are now driven by the FirmwareUpdateToggle dev
+// panel (props). The transfer/verify outcome stays a module constant.
 const SIMULATE_OUTCOME: 'success' | 'fail-transfer' | 'fail-verify' = 'success';
 
 const PRESS = 'active:bg-black active:text-[#838383]';
 const BTN_BASE = `h-14 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] ${PRESS} font-bold text-lg`;
 const BTN_PRIMARY = `h-14 border-2 border-black rounded-sm bg-black text-[#838383] hover:bg-[#838383] hover:text-black ${PRESS} font-bold text-lg`;
 
-export function FirmwareUpdatePage({ onBack, showDebugId }: FirmwareUpdatePageProps) {
+export function FirmwareUpdatePage({
+  onBack,
+  showDebugId,
+  fingerprintEnrolled = true,
+  simulateHasUpdate = true,
+  simulateBatteryOk = true,
+}: FirmwareUpdatePageProps) {
   const [step, setStep] = useState<UpdateStep>('preflight');
   const [progress, setProgress] = useState(0);
   const [wnPage, setWnPage] = useState(0); // "What's new" pager on the confirm screen
@@ -77,6 +94,13 @@ export function FirmwareUpdatePage({ onBack, showDebugId }: FirmwareUpdatePagePr
   // ── Flow drivers ──
 
   const startConnect = () => {
+    // The device self-checks its battery before starting. Below the safe
+    // threshold we stop here — an update interrupted by a dead battery risks a
+    // bricked device, so this is a hard gate, not a warning.
+    if (!simulateBatteryOk) {
+      setStep('battery-low');
+      return;
+    }
     setStep('connect');
     // Assume the device is already paired (per product decision) — just wait
     // briefly for the app to come to the foreground and link up.
@@ -86,7 +110,7 @@ export function FirmwareUpdatePage({ onBack, showDebugId }: FirmwareUpdatePagePr
   const startChecking = () => {
     setStep('checking');
     after(2000, () => {
-      setStep(SIMULATE_HAS_UPDATE ? 'confirm' : 'up-to-date');
+      setStep(simulateHasUpdate ? 'confirm' : 'up-to-date');
     });
   };
 
@@ -329,7 +353,21 @@ export function FirmwareUpdatePage({ onBack, showDebugId }: FirmwareUpdatePagePr
       ok: true,
       header: 'back',
       title: 'Up to date',
-      body: `You're on the latest version (${CURRENT_VERSION}).`,
+      body: `You're on the latest version (${CURRENT_VERSION}). No update is needed.`,
+      primaryLabel: 'Done',
+      onPrimary: onBack,
+    });
+  }
+
+  // ════════════════════════════════════════════
+  // BATTERY-LOW — battery check on Continue failed
+  // ════════════════════════════════════════════
+  if (step === 'battery-low') {
+    return resultScreen({
+      ok: false,
+      header: 'back',
+      title: 'Battery too low',
+      body: 'Charge your device above 50%, then start the update again. This keeps the update from being interrupted.',
       primaryLabel: 'Done',
       onPrimary: onBack,
     });
@@ -403,16 +441,42 @@ export function FirmwareUpdatePage({ onBack, showDebugId }: FirmwareUpdatePagePr
 
           <div className="h-[2px] bg-black flex-shrink-0 mt-3.5" />
 
-          <p className="text-lg font-light text-black leading-snug mt-3">
-            Confirm to receive this update over Bluetooth.
-          </p>
-
-          <div className="mt-auto space-y-3">
-            <button onClick={startTransfer} className={`w-full ${BTN_PRIMARY}`}>Confirm &amp; transfer</button>
+          <div className="mt-auto pt-3 space-y-3">
+            {/* Update requires a second factor (PIN or fingerprint) before the
+                transfer starts — same gate as the Sign confirm. */}
+            <button onClick={() => setStep('verify')} className={`w-full ${BTN_PRIMARY}`}>Update</button>
             <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
           </div>
         </div>
       </div>
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // VERIFY — second factor before the transfer starts (PIN / fingerprint)
+  // ════════════════════════════════════════════
+  if (step === 'verify') {
+    if (fingerprintEnrolled) {
+      return (
+        <FingerprintVerifyPage
+          title="Verify to Update"
+          promptSubtitle="Touch the sensor to start the update"
+          onBack={() => setStep('confirm')}
+          onVerifySuccess={startTransfer}
+          showDebugId={showDebugId}
+        />
+      );
+    }
+    return (
+      <ChangePINPage
+        onBack={() => setStep('confirm')}
+        randomized={true}
+        mode="verify"
+        headerTitle="Firmware Update"
+        verifyTitle="Enter PIN to Update"
+        onVerifySuccess={startTransfer}
+        showDebugId={showDebugId}
+      />
     );
   }
 

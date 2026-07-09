@@ -9,11 +9,17 @@ interface ChangePINPageProps {
   mode?: 'change' | 'verify';
   onVerifySuccess?: () => void;
   showDebugId?: boolean;
+  /** Header label — defaults to "Change PIN". Reusers in a non-PIN-change
+   *  context (e.g. Firmware Update 2FA) pass their own. */
+  headerTitle?: string;
+  /** Title over the keypad in verify mode's single step — defaults to
+   *  "Enter Current PIN". */
+  verifyTitle?: string;
 }
 
 type Step = 'current' | 'new' | 'confirm' | 'success';
 
-export function ChangePINPage({ onBack, randomized = false, mode = 'change', onVerifySuccess, showDebugId }: ChangePINPageProps) {
+export function ChangePINPage({ onBack, randomized = false, mode = 'change', onVerifySuccess, showDebugId, headerTitle = 'Change PIN', verifyTitle = 'Enter Current PIN' }: ChangePINPageProps) {
   const [step, setStep] = useState<Step>('current');
   const [currentPIN, setCurrentPIN] = useState('');
   const [newPIN, setNewPIN] = useState('');
@@ -83,7 +89,7 @@ export function ChangePINPage({ onBack, randomized = false, mode = 'change', onV
   };
 
   const getTitle = () => {
-    if (step === 'current') return 'Enter Current PIN';
+    if (step === 'current') return mode === 'verify' ? verifyTitle : 'Enter Current PIN';
     if (step === 'new') return 'Enter New PIN';
     if (step === 'confirm') return 'Confirm New PIN';
     return 'PIN Changed';
@@ -94,7 +100,7 @@ export function ChangePINPage({ onBack, randomized = false, mode = 'change', onV
       <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
         <PageDebugId page="change-pin" subPage="success" showDebugId={showDebugId} />
         <div className="h-[45px] px-5 flex items-center border-b-2 border-black flex-shrink-0">
-          <span className="text-lg font-bold text-black uppercase tracking-wide">Change PIN</span>
+          <span className="text-lg font-bold text-black uppercase tracking-wide">{headerTitle}</span>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center">
@@ -119,7 +125,7 @@ export function ChangePINPage({ onBack, randomized = false, mode = 'change', onV
           className="flex items-center gap-2 active:scale-95 transition-transform"
         >
           <ChevronLeft className="w-5 h-5 text-black" strokeWidth={2.5} />
-          <span className="text-lg font-bold text-black uppercase tracking-wide">Change PIN</span>
+          <span className="text-lg font-bold text-black uppercase tracking-wide">{headerTitle}</span>
         </button>
       </div>
 

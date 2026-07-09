@@ -33,6 +33,7 @@ import { VariantSwitcher } from './components/VariantSwitcher';
 import { SignTypeSwitcher } from './components/SignTypeSwitcher';
 import { VerifyFontSwitcher, VERIFY_FONTS, type VerifyFont } from './components/VerifyFontSwitcher';
 import { SecondFactorToggle } from './components/SecondFactorToggle';
+import { FirmwareUpdateToggle } from './components/FirmwareUpdateToggle';
 import { KeyboardShowcasePage, type KeyboardVariant } from './components/KeyboardShowcasePage';
 import { KeyboardDocsPanel } from './components/KeyboardDocsPanel';
 // import { PassphraseDocsPanel } from './components/PassphraseDocsPanel'; // temporarily removed per request
@@ -92,6 +93,11 @@ export default function App() {
   const [fingerprintEnrolled, setFingerprintEnrolled] = useState(true);
   // Has the one-time "set up fingerprint?" prompt (after first PIN) been shown?
   const [fingerprintPrompted, setFingerprintPrompted] = useState(false);
+
+  // Firmware Update dev sim (FirmwareUpdateToggle): version-check result and
+  // the on-Continue battery check. Both default to the "happy path".
+  const [firmwareHasUpdate, setFirmwareHasUpdate] = useState(true);
+  const [firmwareBatteryOk, setFirmwareBatteryOk] = useState(true);
   
   // Zoom State (100% = normal, 40% ≈ 3-inch physical size)
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -213,7 +219,7 @@ export default function App() {
       case 'firmware-info':
         return <FirmwareInfoPage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} />;
       case 'firmware-update':
-        return <FirmwareUpdatePage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} />;
+        return <FirmwareUpdatePage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} fingerprintEnrolled={fingerprintEnrolled} simulateHasUpdate={firmwareHasUpdate} simulateBatteryOk={firmwareBatteryOk} />;
       case 'download-app':
         return <DownloadAppPage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} />;
       case 'reset-device':
@@ -402,6 +408,18 @@ export default function App() {
       {/* Second-factor (fingerprint vs PIN) toggle - Only on Sign Request page */}
       {effectivePage === 'sign-request' && (
         <SecondFactorToggle enrolled={fingerprintEnrolled} onChange={(v) => { setFingerprintEnrolled(v); setFingerprintPrompted(false); }} />
+      )}
+
+      {/* Firmware Update sim toggles (version check + battery check + 2nd factor) */}
+      {effectivePage === 'firmware-update' && (
+        <FirmwareUpdateToggle
+          hasUpdate={firmwareHasUpdate}
+          onHasUpdateChange={setFirmwareHasUpdate}
+          batteryOk={firmwareBatteryOk}
+          onBatteryOkChange={setFirmwareBatteryOk}
+          enrolled={fingerprintEnrolled}
+          onEnrolledChange={(v) => { setFingerprintEnrolled(v); setFingerprintPrompted(false); }}
+        />
       )}
 
       {/* Verify Code font switcher - Only on Sign Request page (1-bit font compare) */}
