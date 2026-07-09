@@ -33,7 +33,8 @@ interface FirmwareUpdatePageProps {
 // signature BEFORE rebooting, and applying the image in the bootloader.
 //
 //   (entry battery check) → battery-low | preflight
-//   preflight (reading screen, user-paced, NO timers) → Continue → waiting-app
+//   preflight (warnings, user-paced, NO timers) → Continue → app-guide
+//   app-guide (how to operate the app, user-paced) → Connect to App → waiting-app
 //   waiting-app (pure status, machine-paced) → (up-to-date | confirm)
 //   confirm → verify (PIN/fingerprint) → transferring → verifying
 //   verifying → restarting → boot-install → success (→ Home)
@@ -45,7 +46,7 @@ interface FirmwareUpdatePageProps {
 // is machine-paced — it holds nothing to read, so auto-advancing is fine.
 type UpdateStep =
   | 'battery-low'
-  | 'preflight'
+  | 'preflight' | 'app-guide'
   | 'waiting-app'
   | 'up-to-date'
   | 'confirm' | 'verify'
@@ -302,7 +303,51 @@ export function FirmwareUpdatePage({
           </p>
 
           <div className="mt-auto space-y-3">
-            <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
+            <button onClick={() => setStep('app-guide')} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
+            <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // APP-GUIDE — how to operate the phone app (reading screen, user-paced).
+  // Mock copy until the app side is designed. Header back returns to the
+  // preflight page (page-wise back); Cancel exits the flow.
+  // ════════════════════════════════════════════
+  if (step === 'app-guide') {
+    const APP_STEPS = [
+      'Open Wallet Management in the SafePal app',
+      'Select this hardware wallet',
+      'Tap Firmware Upgrade to check for the new version',
+    ];
+    return (
+      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
+        <PageDebugId page="firmware-update" subPage="guide" showDebugId={showDebugId} />
+        {headerWithBack(() => setStep('preflight'))}
+        <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
+          <h2 className="text-xl font-bold text-black mb-4">On your phone</h2>
+
+          <div className="space-y-4">
+            {APP_STEPS.map((text, i) => (
+              <div key={i} className="flex gap-3">
+                <div className="w-8 h-8 border-2 border-black rounded-sm flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg font-bold text-black">{i + 1}</span>
+                </div>
+                <p className="text-lg text-black leading-snug pt-0.5">{text}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="h-[2px] bg-black flex-shrink-0 my-4" />
+
+          <p className="text-lg font-light text-black leading-snug">
+            Tap Connect to App — this device will then wait for the app.
+          </p>
+
+          <div className="mt-auto space-y-3">
+            <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Connect to App</button>
             <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
           </div>
         </div>
@@ -325,12 +370,14 @@ export function FirmwareUpdatePage({
             <div className="text-xl font-bold text-black mb-2">
               {linked ? 'Connected' : 'Waiting for the app…'}
             </div>
-            {/* Fixed-height slot sized for the longer (3-line) phase text so
-                the swap doesn't shift the spinner (CONSTRAINTS § 1). */}
-            <p className="text-lg text-black max-w-[280px] leading-snug min-h-[84px]">
+            {/* Fixed-height slot sized for the longer (2-line) phase text so
+                the swap doesn't shift the spinner (CONSTRAINTS § 1). The
+                detailed app steps live on the app-guide page — this line only
+                points back at them, it doesn't re-explain. */}
+            <p className="text-lg text-black max-w-[280px] leading-snug min-h-[56px]">
               {linked
                 ? 'Receiving firmware info from the app…'
-                : 'Open Firmware Upgrade in the SafePal app and start the update there.'}
+                : 'Follow the steps in the app. Keep this device nearby.'}
             </p>
             <div className="mt-4">
               <Loader2 className="w-6 h-6 text-black animate-spin" strokeWidth={2.5} />

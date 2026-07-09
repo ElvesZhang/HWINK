@@ -82,15 +82,16 @@ export const SUB_PAGE_IDS = {
   // #18 - Firmware Update Page (app-led flow: the phone app checks/downloads,
   // the device passively receives)
   'firmware-update': {
-    'preflight': 1,    // 18-1: Before you update (reading screen, user-paced)
-    'waiting': 2,      // 18-2: Waiting for the app (BLE link + firmware info)
-    'latest': 3,       // 18-3: Already latest version (app reports no update)
-    'available': 4,    // 18-4: Update available (confirm)
-    'transfer': 5,     // 18-5: Receiving firmware (+ transfer-failed)
-    'verify-fw': 6,    // 18-6: Verifying firmware signature (+ verify-failed)
-    'boot': 7,         // 18-7: Restarting + bootloader install
-    'success': 8,      // 18-8: Update complete
-    'battery': 9,      // 18-9: Battery too low (entry check failed)
+    'preflight': 1,    // 18-1: Before you update (warnings, user-paced)
+    'guide': 2,        // 18-2: On your phone (app operation steps, user-paced)
+    'waiting': 3,      // 18-3: Waiting for the app (BLE link + firmware info)
+    'latest': 4,       // 18-4: Already latest version (app reports no update)
+    'available': 5,    // 18-5: Update available (confirm)
+    'transfer': 6,     // 18-6: Receiving firmware (+ transfer-failed)
+    'verify-fw': 7,    // 18-7: Verifying firmware signature (+ verify-failed)
+    'boot': 8,         // 18-8: Restarting + bootloader install
+    'success': 9,      // 18-9: Update complete
+    'battery': 10,     // 18-10: Battery too low (entry check failed)
   },
   
   // #20 - Reset Device Page
