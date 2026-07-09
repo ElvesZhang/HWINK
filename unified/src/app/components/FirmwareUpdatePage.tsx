@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import {
   ChevronLeft, ChevronRight, AlertTriangle, Check, X, Loader2,
-  ArrowDown, RotateCw, ShieldCheck,
+  Smartphone, ArrowDown, RotateCw, ShieldCheck,
 } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
 import { FingerprintVerifyPage } from './FingerprintVerifyPage';
@@ -32,13 +32,20 @@ interface FirmwareUpdatePageProps {
 // is offered, gating the transfer behind a second factor, verifying the
 // signature BEFORE rebooting, and applying the image in the bootloader.
 //
-//   (entry battery check) → battery-low | waiting-app
-//   waiting-app → (up-to-date | confirm)         ← the app reports the result
+//   (entry battery check) → battery-low | preflight
+//   preflight (reading screen, user-paced, NO timers) → Continue → waiting-app
+//   waiting-app (pure status, machine-paced) → (up-to-date | confirm)
 //   confirm → verify (PIN/fingerprint) → transferring → verifying
 //   verifying → restarting → boot-install → success (→ Home)
 //   failures: battery-low | failed-transfer | failed-verify
+//
+// Pacing rule: reading content (warnings, instructions) and live status never
+// share a screen. The preflight screen is user-paced — it sits until the user
+// taps Continue (= the device starts listening over BLE). The waiting screen
+// is machine-paced — it holds nothing to read, so auto-advancing is fine.
 type UpdateStep =
   | 'battery-low'
+  | 'preflight'
   | 'waiting-app'
   | 'up-to-date'
   | 'confirm' | 'verify'
@@ -79,11 +86,11 @@ export function FirmwareUpdatePage({
   simulateOutcome = 'success',
 }: FirmwareUpdatePageProps) {
   // The device self-checks its battery the moment the page opens (fail fast —
-  // don't let the user sit through a BLE wait only to be stopped later). An
+  // don't let the user read the preflight text only to be stopped later). An
   // update interrupted by a dead battery risks a bricked device, so this is a
   // hard gate, not a warning. Seeded via the initializer to avoid an extra
   // first-frame repaint on e-ink.
-  const [step, setStep] = useState<UpdateStep>(simulateBatteryOk ? 'waiting-app' : 'battery-low');
+  const [step, setStep] = useState<UpdateStep>(simulateBatteryOk ? 'preflight' : 'battery-low');
   // waiting-app sub-status: has the BLE link to the app come up yet?
   const [linked, setLinked] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -268,15 +275,16 @@ export function FirmwareUpdatePage({
   }
 
   // ════════════════════════════════════════════
-  // WAITING-APP — the app checks + downloads; this device just listens
+  // PREFLIGHT — reading screen, user-paced (no timers). Continue = the device
+  // starts listening over BLE.
   // ════════════════════════════════════════════
-  if (step === 'waiting-app') {
+  if (step === 'preflight') {
     return (
       <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-        <PageDebugId page="firmware-update" subPage="waiting" showDebugId={showDebugId} />
+        <PageDebugId page="firmware-update" subPage="preflight" showDebugId={showDebugId} />
         {headerWithBack(onBack)}
         <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
-          <h2 className="text-xl font-bold text-black mb-4">Start from your phone</h2>
+          <h2 className="text-xl font-bold text-black mb-4">Before you update</h2>
 
           <div className="border-4 border-black rounded-sm p-4 bg-black text-[#838383] mb-4">
             <h3 className="text-lg font-bold flex items-center gap-1 mb-3">
@@ -290,20 +298,44 @@ export function FirmwareUpdatePage({
           </div>
 
           <p className="text-lg text-black leading-snug">
-            Open the SafePal app and tap Firmware Upgrade. The app downloads the firmware and sends it here.
+            The update is delivered by the SafePal app: it downloads the firmware and sends it to this device over Bluetooth.
           </p>
 
-          {/* Status slot — fixed height so the text swap doesn't shift layout
-              (CONSTRAINTS § 1 fixed-height feedback slots). */}
-          <div className="flex-1 min-h-[56px] flex items-center justify-center">
-            <div className="flex items-center gap-2 text-center">
-              <Loader2 className="w-5 h-5 text-black animate-spin flex-shrink-0" strokeWidth={2.5} />
-              <span className="text-lg font-bold text-black">
-                {linked ? 'Connected. Waiting for firmware info…' : 'Waiting for the app…'}
-              </span>
+          <div className="mt-auto space-y-3">
+            <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
+            <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // WAITING-APP — pure status screen (nothing to read); the app checks +
+  // downloads, this device just listens. Auto-advances when the app answers.
+  // ════════════════════════════════════════════
+  if (step === 'waiting-app') {
+    return (
+      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
+        <PageDebugId page="firmware-update" subPage="waiting" showDebugId={showDebugId} />
+        {headerWithBack(onBack)}
+        <div className="flex-1 px-6 pt-2 pb-6 flex flex-col">
+          <div className="flex-1 flex flex-col items-center justify-center text-center">
+            <Smartphone className="w-20 h-20 text-black mb-5" strokeWidth={1.5} />
+            <div className="text-xl font-bold text-black mb-2">
+              {linked ? 'Connected' : 'Waiting for the app…'}
+            </div>
+            {/* Fixed-height slot sized for the longer (3-line) phase text so
+                the swap doesn't shift the spinner (CONSTRAINTS § 1). */}
+            <p className="text-lg text-black max-w-[280px] leading-snug min-h-[84px]">
+              {linked
+                ? 'Receiving firmware info from the app…'
+                : 'Open Firmware Upgrade in the SafePal app and start the update there.'}
+            </p>
+            <div className="mt-4">
+              <Loader2 className="w-6 h-6 text-black animate-spin" strokeWidth={2.5} />
             </div>
           </div>
-
           <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
         </div>
       </div>
