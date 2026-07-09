@@ -309,24 +309,20 @@ export function FirmwareUpdatePage({
         <PageDebugId page="firmware-update" subPage="preflight" showDebugId={showDebugId} />
         {headerWithBack(onBack)}
         <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
-          {/* Title + checklist sit centered in the free space (the how-it-works
-              paragraph was cut as redundant); buttons stay pinned at the bottom. */}
-          <div className="flex-1 flex flex-col justify-center pb-8">
-            <h2 className="text-xl font-bold text-black mb-5">Before you update</h2>
+          <h2 className="text-xl font-bold text-black mb-4">Before you update</h2>
 
-            <div className="border-4 border-black rounded-sm p-5 bg-black text-[#838383]">
-              <h3 className="text-lg font-bold flex items-center gap-1 mb-3">
-                <AlertTriangle className="w-4 h-4" strokeWidth={3} /> Make sure
-              </h3>
-              <ul className="space-y-2.5 text-lg">
-                <li>- Your recovery phrase is backed up</li>
-                <li>- Keep the device near your phone</li>
-                <li>- Do not turn off Bluetooth</li>
-              </ul>
-            </div>
+          <div className="border-4 border-black rounded-sm p-4 bg-black text-[#838383] mb-4">
+            <h3 className="text-lg font-bold flex items-center gap-1 mb-3">
+              <AlertTriangle className="w-4 h-4" strokeWidth={3} /> Make sure
+            </h3>
+            <ul className="space-y-2 text-lg">
+              <li>- Your recovery phrase is backed up</li>
+              <li>- Keep the device near your phone</li>
+              <li>- Do not turn off Bluetooth</li>
+            </ul>
           </div>
 
-          <div className="space-y-3">
+          <div className="mt-auto space-y-3">
             <button onClick={() => setStep('app-guide')} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
             <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
           </div>
