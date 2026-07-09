@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import {
-  ChevronLeft, ChevronRight, AlertTriangle, Check, X, Loader2,
+  ChevronLeft, AlertTriangle, Check, X, Loader2,
   Smartphone, ArrowDown, RotateCw, ShieldCheck,
 } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
@@ -62,23 +62,11 @@ type UpdateStep =
 const CURRENT_VERSION = 'v2.1.5';
 const NEW_VERSION = 'v2.2.0';
 
-// Release notes for the confirm screen. Paged by whole items (a bullet is never
-// split across pages), 6 per page — sized to fill the list area between the
-// version block and the action buttons (~196px ≈ 6 × 29px rows), so pages
-// don't show large empty regions. Same inline section pager as the Message
-// signing screen.
-const WHATS_NEW = [
-  '- New chain support and address types',
-  '- Faster transaction signing',
-  '- Security hardening',
-  '- Improved Bluetooth pairing stability',
-  '- Clearer signing screens for token approvals',
-  '- Fingerprint unlock improvements',
-  '- NFC backup card compatibility fixes',
-  '- Reduced e-ink refresh artifacts',
-  '- General bug fixes and performance',
-];
-const WN_PER_PAGE = 6;
+// NOTE: release notes ("What's New") are deliberately NOT shown on the device.
+// They are free-form server-fed text and the device ships a trimmed font
+// subset — unvetted copy would render as missing glyphs. They also carry no
+// security value (the device only attests what it can verify: version strings
+// and the firmware signature). The confirm screen points at the app instead.
 
 const PRESS = 'active:bg-black active:text-[#838383]';
 const BTN_BASE = `h-14 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] ${PRESS} font-bold text-lg`;
@@ -103,7 +91,6 @@ export function FirmwareUpdatePage({
   // waiting-app sub-status: has the BLE link to the app come up yet?
   const [linked, setLinked] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [wnPage, setWnPage] = useState(0); // "What's new" pager on the confirm screen
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const intervals = useRef<ReturnType<typeof setInterval>[]>([]);
 
@@ -366,11 +353,11 @@ export function FirmwareUpdatePage({
           <div className="h-[2px] bg-black flex-shrink-0 my-4" />
 
           <p className="text-lg font-light text-black leading-snug">
-            Tap Connect to App — this device will then wait for the app.
+            Tap Connect &amp; Receive — this device will then wait for the app.
           </p>
 
           <div className="mt-auto space-y-3">
-            <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Connect to App</button>
+            <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Connect &amp; Receive</button>
             <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
           </div>
         </div>
@@ -406,6 +393,11 @@ export function FirmwareUpdatePage({
               <Loader2 className="w-6 h-6 text-black animate-spin" strokeWidth={2.5} />
             </div>
           </div>
+          {/* Static reminder (not part of the phase-swapping slot): the update
+              path is BLE-only — pre-empt the "which cable do I plug in" reflex. */}
+          <p className="text-lg font-light text-black text-center mb-4">
+            Bluetooth only — no USB cable is needed.
+          </p>
           <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
         </div>
       </div>
@@ -452,48 +444,11 @@ export function FirmwareUpdatePage({
 
           <div className="h-[2px] bg-black flex-shrink-0 my-3.5" />
 
-          {(() => {
-            const wnPages = Math.ceil(WHATS_NEW.length / WN_PER_PAGE);
-            const wnItems = WHATS_NEW.slice(wnPage * WN_PER_PAGE, (wnPage + 1) * WN_PER_PAGE);
-            return (
-              <div className="flex-1 min-h-0 flex flex-col">
-                {/* Section pager — label + (n/N) left, ‹ › right (Message-screen style). */}
-                <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-light text-black uppercase tracking-wide leading-none">What's new</span>
-                    {wnPages > 1 && (
-                      <span className="text-lg text-black font-bold">({wnPage + 1}/{wnPages})</span>
-                    )}
-                  </div>
-                  {wnPages > 1 && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setWnPage(p => Math.max(0, p - 1))}
-                        disabled={wnPage === 0}
-                        className="w-7 h-7 flex items-center justify-center hover:bg-black hover:text-[#838383] active:scale-95 transition-colors disabled:invisible"
-                        aria-label="Previous page"
-                      >
-                        <ChevronLeft className="w-4 h-4 text-black" strokeWidth={2.5} />
-                      </button>
-                      <button
-                        onClick={() => setWnPage(p => Math.min(wnPages - 1, p + 1))}
-                        disabled={wnPage === wnPages - 1}
-                        className="w-7 h-7 flex items-center justify-center hover:bg-black hover:text-[#838383] active:scale-95 transition-colors disabled:invisible"
-                        aria-label="Next page"
-                      >
-                        <ChevronRight className="w-4 h-4 text-black" strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <ul className="space-y-1 text-lg text-black leading-snug overflow-hidden">
-                  {wnItems.map((line, i) => <li key={i}>{line}</li>)}
-                </ul>
-              </div>
-            );
-          })()}
-
-          <div className="h-[2px] bg-black flex-shrink-0 mt-3.5" />
+          {/* Release notes live in the app (trimmed device font subset — see
+              note at top of file); the device just points there. */}
+          <p className="text-lg font-light text-black leading-snug">
+            See what's new in the SafePal app.
+          </p>
 
           <div className="mt-auto pt-3 space-y-3">
             {/* Update requires a second factor (PIN or fingerprint) before the
