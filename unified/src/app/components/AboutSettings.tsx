@@ -31,9 +31,9 @@ export function AboutSettings({ onBack, onNavigate, showDebugId }: AboutSettings
             subtitle="Device model and version"
             onClick={() => onNavigate('firmware-info')}
           />
-          <SettingsItem 
-            title="Check for Updates" 
-            subtitle="Update to latest firmware"
+          <SettingsItem
+            title="Firmware Update"
+            subtitle="Install the latest version"
             onClick={() => onNavigate('firmware-update')}
           />
           <SettingsItem 

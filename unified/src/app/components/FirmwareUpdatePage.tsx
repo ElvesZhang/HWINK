@@ -63,7 +63,9 @@ const CURRENT_VERSION = 'v2.1.5';
 const NEW_VERSION = 'v2.2.0';
 
 // Release notes for the confirm screen. Paged by whole items (a bullet is never
-// split across pages), 4 per page — same inline section pager as the Message
+// split across pages), 6 per page — sized to fill the list area between the
+// version block and the action buttons (~196px ≈ 6 × 29px rows), so pages
+// don't show large empty regions. Same inline section pager as the Message
 // signing screen.
 const WHATS_NEW = [
   '- New chain support and address types',
@@ -76,7 +78,7 @@ const WHATS_NEW = [
   '- Reduced e-ink refresh artifacts',
   '- General bug fixes and performance',
 ];
-const WN_PER_PAGE = 4;
+const WN_PER_PAGE = 6;
 
 const PRESS = 'active:bg-black active:text-[#838383]';
 const BTN_BASE = `h-14 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] ${PRESS} font-bold text-lg`;
@@ -307,24 +309,24 @@ export function FirmwareUpdatePage({
         <PageDebugId page="firmware-update" subPage="preflight" showDebugId={showDebugId} />
         {headerWithBack(onBack)}
         <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
-          <h2 className="text-xl font-bold text-black mb-4">Before you update</h2>
+          {/* Title + checklist sit centered in the free space (the how-it-works
+              paragraph was cut as redundant); buttons stay pinned at the bottom. */}
+          <div className="flex-1 flex flex-col justify-center pb-8">
+            <h2 className="text-xl font-bold text-black mb-5">Before you update</h2>
 
-          <div className="border-4 border-black rounded-sm p-4 bg-black text-[#838383] mb-4">
-            <h3 className="text-lg font-bold flex items-center gap-1 mb-3">
-              <AlertTriangle className="w-4 h-4" strokeWidth={3} /> Make sure
-            </h3>
-            <ul className="space-y-2 text-lg">
-              <li>- Your recovery phrase is backed up</li>
-              <li>- Keep the device near your phone</li>
-              <li>- Do not turn off Bluetooth</li>
-            </ul>
+            <div className="border-4 border-black rounded-sm p-5 bg-black text-[#838383]">
+              <h3 className="text-lg font-bold flex items-center gap-1 mb-3">
+                <AlertTriangle className="w-4 h-4" strokeWidth={3} /> Make sure
+              </h3>
+              <ul className="space-y-2.5 text-lg">
+                <li>- Your recovery phrase is backed up</li>
+                <li>- Keep the device near your phone</li>
+                <li>- Do not turn off Bluetooth</li>
+              </ul>
+            </div>
           </div>
 
-          <p className="text-lg text-black leading-snug">
-            The update is delivered by the SafePal app: it downloads the firmware and sends it to this device over Bluetooth.
-          </p>
-
-          <div className="mt-auto space-y-3">
+          <div className="space-y-3">
             <button onClick={() => setStep('app-guide')} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
             <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
           </div>
@@ -352,12 +354,15 @@ export function FirmwareUpdatePage({
           <h2 className="text-xl font-bold text-black mb-4">On your phone</h2>
 
           <div className="space-y-4">
+            {/* Number box is 28px — the same height as one text-lg/leading-snug
+                line box (~25px) plus the 2px offset — so the first line of a
+                wrapped step stays optically centered against its number. */}
             {APP_STEPS.map((text, i) => (
-              <div key={i} className="flex gap-3">
-                <div className="w-8 h-8 border-2 border-black rounded-sm flex items-center justify-center flex-shrink-0">
-                  <span className="text-lg font-bold text-black">{i + 1}</span>
+              <div key={i} className="flex gap-3 items-start">
+                <div className="w-7 h-7 border-2 border-black rounded-sm flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg font-bold text-black leading-none">{i + 1}</span>
                 </div>
-                <p className="text-lg text-black leading-snug pt-0.5">{text}</p>
+                <p className="text-lg text-black leading-snug pt-0.5 min-w-0">{text}</p>
               </div>
             ))}
           </div>
@@ -648,7 +653,7 @@ export function FirmwareUpdatePage({
       sub: 'waiting',
       header: 'back',
       title: 'Connection lost',
-      body: 'The app connected, but the firmware info did not come through. Keep the device near your phone and try again.',
+      body: 'Your phone connected, but the app did not send back the firmware info. Keep the device near your phone and try again.',
       primaryLabel: 'Retry',
       onPrimary: retryWaiting,
       secondaryLabel: 'Cancel',
