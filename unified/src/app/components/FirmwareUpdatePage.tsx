@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import {
   ChevronLeft, AlertTriangle, Check, X, Loader2,
-  Smartphone, ArrowDown, RotateCw, ShieldCheck,
+  Smartphone, ArrowDown, ArrowRight, RotateCw, ShieldCheck,
 } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
 import { FingerprintVerifyPage } from './FingerprintVerifyPage';
@@ -114,20 +114,26 @@ export function FirmwareUpdatePage({
   // checked versions and downloaded the blob) reports its result. Each phase
   // fails on its own: no link within the window → failed-connect; linked but
   // the firmware info never arrives → failed-info.
-  useEffect(() => {
-    if (step !== 'waiting-app') return;
-    if (simulateConnect === 'fail-ble') {
-      after(4000, () => setStep('failed-connect'));
+  //
+  // PROTOTYPE: on real hardware these are machine-paced BLE events; here each
+  // one is simulated by tapping the status area (like the fingerprint page's
+  // tap-to-scan), so a reviewer can hold and inspect every state — nothing
+  // advances until tapped.
+  const advanceWaiting = () => {
+    if (!linked) {
+      if (simulateConnect === 'fail-ble') {
+        setStep('failed-connect');
+        return;
+      }
+      setLinked(true);
       return;
     }
-    after(2500, () => setLinked(true));
     if (simulateConnect === 'fail-info') {
-      after(4500, () => setStep('failed-info'));
+      setStep('failed-info');
       return;
     }
-    after(4000, () => setStep(simulateHasUpdate ? 'confirm' : 'up-to-date'));
-    // Timers self-clean on unmount; re-entering 'waiting-app' (Retry) re-runs.
-  }, [step]);
+    setStep(simulateHasUpdate ? 'confirm' : 'up-to-date');
+  };
 
   // Retry from a connect failure: back to listening with a clean sub-status.
   const retryWaiting = () => {
@@ -353,11 +359,11 @@ export function FirmwareUpdatePage({
           <div className="h-[2px] bg-black flex-shrink-0 my-4" />
 
           <p className="text-lg font-light text-black leading-snug">
-            Tap Connect &amp; Receive — this device will then wait for the app.
+            Tap Continue — this device will then wait for the app.
           </p>
 
           <div className="mt-auto space-y-3">
-            <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Connect &amp; Receive</button>
+            <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
             <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
           </div>
         </div>
@@ -375,7 +381,13 @@ export function FirmwareUpdatePage({
         <PageDebugId page="firmware-update" subPage="waiting" showDebugId={showDebugId} />
         {headerWithBack(onBack)}
         <div className="flex-1 px-6 pt-2 pb-6 flex flex-col">
-          <div className="flex-1 flex flex-col items-center justify-center text-center">
+          {/* Tap = simulate the next BLE event arriving (prototype only). */}
+          <div
+            onClick={advanceWaiting}
+            role="button"
+            aria-label="Simulate the next connection event"
+            className="flex-1 flex flex-col items-center justify-center text-center cursor-pointer"
+          >
             <Smartphone className="w-20 h-20 text-black mb-5" strokeWidth={1.5} />
             <div className="text-xl font-bold text-black mb-2">
               {linked ? 'Connected' : 'Waiting for the app…'}
@@ -430,19 +442,24 @@ export function FirmwareUpdatePage({
         <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
           <h2 className="text-xl font-bold text-black mb-4">Update available</h2>
 
-          {/* Versions — flat fields side by side (no info cards). */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">Current</div>
-              <div className="text-2xl font-normal text-black">{CURRENT_VERSION}</div>
-            </div>
-            <div>
-              <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">New</div>
-              <div className="text-2xl font-normal text-black">{NEW_VERSION}</div>
+          {/* Version transition is the hero — centered in the free space
+              (sign-screen big-typography language): current → NEW, with the
+              target version carrying the emphasis. */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex items-end justify-center gap-5">
+              <div>
+                <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">Current</div>
+                <div className="text-3xl font-normal text-black">{CURRENT_VERSION}</div>
+              </div>
+              <ArrowRight className="w-8 h-8 text-black mb-1 flex-shrink-0" strokeWidth={2.5} />
+              <div>
+                <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">New</div>
+                <div className="text-3xl font-bold text-black">{NEW_VERSION}</div>
+              </div>
             </div>
           </div>
 
-          <div className="h-[2px] bg-black flex-shrink-0 my-3.5" />
+          <div className="h-[2px] bg-black flex-shrink-0 mb-3" />
 
           {/* Release notes live in the app (trimmed device font subset — see
               note at top of file); the device just points there. */}
@@ -450,7 +467,7 @@ export function FirmwareUpdatePage({
             See what's new in the SafePal app.
           </p>
 
-          <div className="mt-auto pt-3 space-y-3">
+          <div className="pt-3 space-y-3">
             {/* Update requires a second factor (PIN or fingerprint) before the
                 transfer starts — same gate as the Sign confirm. */}
             <button onClick={() => setStep('verify')} className={`w-full ${BTN_PRIMARY}`}>Update</button>
