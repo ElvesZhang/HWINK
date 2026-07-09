@@ -19,6 +19,9 @@ interface FirmwareUpdatePageProps {
   fingerprintEnrolled?: boolean;
   /** Prototype sim: does the app report a newer firmware once linked? */
   simulateHasUpdate?: boolean;
+  /** Prototype sim: how the waiting-for-app phase ends — BLE link up + info
+   *  received, no link at all, or link drops before the info arrives. */
+  simulateConnect?: 'success' | 'fail-ble' | 'fail-info';
   /** Prototype sim: does the on-entry battery check pass? */
   simulateBatteryOk?: boolean;
   /** Prototype sim: how the transfer/verify phases end. */
@@ -36,9 +39,11 @@ interface FirmwareUpdatePageProps {
 //   preflight (warnings, user-paced, NO timers) → Continue → app-guide
 //   app-guide (how to operate the app, user-paced) → Connect to App → waiting-app
 //   waiting-app (pure status, machine-paced) → (up-to-date | confirm)
+//     each waiting phase has its own failure: no BLE link → failed-connect;
+//     linked but the firmware info never arrives → failed-info
 //   confirm → verify (PIN/fingerprint) → transferring → verifying
 //   verifying → restarting → boot-install → success (→ Home)
-//   failures: battery-low | failed-transfer | failed-verify
+//   failures: battery-low | failed-connect | failed-info | failed-transfer | failed-verify
 //
 // Pacing rule: reading content (warnings, instructions) and live status never
 // share a screen. The preflight screen is user-paced — it sits until the user
@@ -52,7 +57,7 @@ type UpdateStep =
   | 'confirm' | 'verify'
   | 'transferring' | 'verifying'
   | 'restarting' | 'boot-install' | 'success'
-  | 'failed-transfer' | 'failed-verify';
+  | 'failed-connect' | 'failed-info' | 'failed-transfer' | 'failed-verify';
 
 const CURRENT_VERSION = 'v2.1.5';
 const NEW_VERSION = 'v2.2.0';
@@ -84,6 +89,7 @@ export function FirmwareUpdatePage({
   fingerprintEnrolled = true,
   simulateHasUpdate = true,
   simulateBatteryOk = true,
+  simulateConnect = 'success',
   simulateOutcome = 'success',
 }: FirmwareUpdatePageProps) {
   // The device self-checks its battery the moment the page opens (fail fast —
@@ -116,13 +122,29 @@ export function FirmwareUpdatePage({
   // ── Flow drivers ──
 
   // Waiting-for-app sequence: BLE link comes up, then the app (which already
-  // checked versions and downloaded the blob) reports its result.
+  // checked versions and downloaded the blob) reports its result. Each phase
+  // fails on its own: no link within the window → failed-connect; linked but
+  // the firmware info never arrives → failed-info.
   useEffect(() => {
     if (step !== 'waiting-app') return;
+    if (simulateConnect === 'fail-ble') {
+      after(4000, () => setStep('failed-connect'));
+      return;
+    }
     after(2500, () => setLinked(true));
+    if (simulateConnect === 'fail-info') {
+      after(4500, () => setStep('failed-info'));
+      return;
+    }
     after(4000, () => setStep(simulateHasUpdate ? 'confirm' : 'up-to-date'));
-    // Timers self-clean on unmount; step only enters 'waiting-app' once.
+    // Timers self-clean on unmount; re-entering 'waiting-app' (Retry) re-runs.
   }, [step]);
+
+  // Retry from a connect failure: back to listening with a clean sub-status.
+  const retryWaiting = () => {
+    setLinked(false);
+    setStep('waiting-app');
+  };
 
   const startTransfer = () => {
     setStep('transferring');
@@ -606,6 +628,34 @@ export function FirmwareUpdatePage({
   // ════════════════════════════════════════════
   // FAILURE SCREENS
   // ════════════════════════════════════════════
+  if (step === 'failed-connect') {
+    return resultScreen({
+      ok: false,
+      sub: 'waiting',
+      header: 'back',
+      title: "Couldn't connect",
+      body: 'We could not reach the SafePal app over Bluetooth. Make sure Bluetooth is on and the app is open, then try again.',
+      primaryLabel: 'Retry',
+      onPrimary: retryWaiting,
+      secondaryLabel: 'Cancel',
+      onSecondary: onBack,
+    });
+  }
+
+  if (step === 'failed-info') {
+    return resultScreen({
+      ok: false,
+      sub: 'waiting',
+      header: 'back',
+      title: 'Connection lost',
+      body: 'The app connected, but the firmware info did not come through. Keep the device near your phone and try again.',
+      primaryLabel: 'Retry',
+      onPrimary: retryWaiting,
+      secondaryLabel: 'Cancel',
+      onSecondary: onBack,
+    });
+  }
+
   if (step === 'failed-transfer') {
     return resultScreen({
       ok: false,

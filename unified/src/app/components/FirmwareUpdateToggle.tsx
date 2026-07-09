@@ -1,6 +1,7 @@
 import { RefreshCw, CheckCircle, BatteryFull, BatteryLow, Fingerprint, Lock } from 'lucide-react';
 
 export type FirmwareOutcome = 'success' | 'fail-transfer' | 'fail-verify';
+export type FirmwareConnect = 'success' | 'fail-ble' | 'fail-info';
 
 /**
  * Dev-only toggles for the Firmware Update flow (prototype simulation
@@ -15,6 +16,8 @@ export type FirmwareOutcome = 'success' | 'fail-transfer' | 'fail-verify';
  *                 false → "Battery too low" failure screen
  *  - enrolled   : device has a fingerprint enrolled? Drives the second factor
  *                 on "Update" (fingerprint scan vs PIN keypad).
+ *  - connect    : how the waiting-for-app phase ends (link up + info received
+ *                 / no BLE link at all / linked but info never arrives).
  *  - outcome    : how the transfer/verify phases end (success / BLE drop
  *                 mid-transfer / signature verification failure).
  */
@@ -25,6 +28,8 @@ export function FirmwareUpdateToggle({
   onBatteryOkChange,
   enrolled,
   onEnrolledChange,
+  connect,
+  onConnectChange,
   outcome,
   onOutcomeChange,
 }: {
@@ -34,9 +39,16 @@ export function FirmwareUpdateToggle({
   onBatteryOkChange: (v: boolean) => void;
   enrolled: boolean;
   onEnrolledChange: (v: boolean) => void;
+  connect: FirmwareConnect;
+  onConnectChange: (v: FirmwareConnect) => void;
   outcome: FirmwareOutcome;
   onOutcomeChange: (v: FirmwareOutcome) => void;
 }) {
+  const CONNECTS: { value: FirmwareConnect; label: string }[] = [
+    { value: 'success', label: '成功' },
+    { value: 'fail-ble', label: '蓝牙连不上' },
+    { value: 'fail-info', label: '连接后中断' },
+  ];
   const OUTCOMES: { value: FirmwareOutcome; label: string }[] = [
     { value: 'success', label: '成功' },
     { value: 'fail-transfer', label: '传输中断' },
@@ -75,6 +87,19 @@ export function FirmwareUpdateToggle({
         {enrolled ? <Fingerprint className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
         <span>{enrolled ? '指纹验证' : 'PIN 验证'}</span>
       </button>
+
+      <div className="text-[10px] text-gray-500 mt-3 mb-1">蓝牙连接结果</div>
+      <div className="flex flex-col gap-1">
+        {CONNECTS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => onConnectChange(value)}
+            className={`w-full h-8 px-2.5 rounded text-xs font-bold transition-all ${connect === value ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <div className="text-[10px] text-gray-500 mt-3 mb-1">传输/校验结果</div>
       <div className="flex flex-col gap-1">

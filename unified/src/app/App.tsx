@@ -33,7 +33,7 @@ import { VariantSwitcher } from './components/VariantSwitcher';
 import { SignTypeSwitcher } from './components/SignTypeSwitcher';
 import { VerifyFontSwitcher, VERIFY_FONTS, type VerifyFont } from './components/VerifyFontSwitcher';
 import { SecondFactorToggle } from './components/SecondFactorToggle';
-import { FirmwareUpdateToggle, type FirmwareOutcome } from './components/FirmwareUpdateToggle';
+import { FirmwareUpdateToggle, type FirmwareOutcome, type FirmwareConnect } from './components/FirmwareUpdateToggle';
 import { KeyboardShowcasePage, type KeyboardVariant } from './components/KeyboardShowcasePage';
 import { KeyboardDocsPanel } from './components/KeyboardDocsPanel';
 // import { PassphraseDocsPanel } from './components/PassphraseDocsPanel'; // temporarily removed per request
@@ -99,6 +99,7 @@ export default function App() {
   // end. All default to the "happy path".
   const [firmwareHasUpdate, setFirmwareHasUpdate] = useState(true);
   const [firmwareBatteryOk, setFirmwareBatteryOk] = useState(true);
+  const [firmwareConnect, setFirmwareConnect] = useState<FirmwareConnect>('success');
   const [firmwareOutcome, setFirmwareOutcome] = useState<FirmwareOutcome>('success');
   
   // Zoom State (100% = normal, 40% ≈ 3-inch physical size)
@@ -223,7 +224,7 @@ export default function App() {
       case 'firmware-update':
         // Keyed on the sim switches: the battery gate runs at mount, so a
         // toggle change restarts the flow from the entry check.
-        return <FirmwareUpdatePage key={`${firmwareBatteryOk}-${firmwareHasUpdate}-${firmwareOutcome}`} onBack={() => setCurrentPage('about')} onCompleteToHome={() => setCurrentPage('home')} showDebugId={showDebugId} fingerprintEnrolled={fingerprintEnrolled} simulateHasUpdate={firmwareHasUpdate} simulateBatteryOk={firmwareBatteryOk} simulateOutcome={firmwareOutcome} />;
+        return <FirmwareUpdatePage key={`${firmwareBatteryOk}-${firmwareHasUpdate}-${firmwareConnect}-${firmwareOutcome}`} onBack={() => setCurrentPage('about')} onCompleteToHome={() => setCurrentPage('home')} showDebugId={showDebugId} fingerprintEnrolled={fingerprintEnrolled} simulateHasUpdate={firmwareHasUpdate} simulateBatteryOk={firmwareBatteryOk} simulateConnect={firmwareConnect} simulateOutcome={firmwareOutcome} />;
       case 'download-app':
         return <DownloadAppPage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} />;
       case 'reset-device':
@@ -423,6 +424,8 @@ export default function App() {
           onBatteryOkChange={setFirmwareBatteryOk}
           enrolled={fingerprintEnrolled}
           onEnrolledChange={(v) => { setFingerprintEnrolled(v); setFingerprintPrompted(false); }}
+          connect={firmwareConnect}
+          onConnectChange={setFirmwareConnect}
           outcome={firmwareOutcome}
           onOutcomeChange={setFirmwareOutcome}
         />

@@ -84,7 +84,7 @@ export const SUB_PAGE_IDS = {
   'firmware-update': {
     'preflight': 1,    // 18-1: Before you update (warnings, user-paced)
     'guide': 2,        // 18-2: On your phone (app operation steps, user-paced)
-    'waiting': 3,      // 18-3: Waiting for the app (BLE link + firmware info)
+    'waiting': 3,      // 18-3: Waiting for the app (+ connect/info failures)
     'latest': 4,       // 18-4: Already latest version (app reports no update)
     'available': 5,    // 18-5: Update available (confirm)
     'transfer': 6,     // 18-6: Receiving firmware (+ transfer-failed)
