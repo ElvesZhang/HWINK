@@ -33,7 +33,7 @@ import { VariantSwitcher } from './components/VariantSwitcher';
 import { SignTypeSwitcher } from './components/SignTypeSwitcher';
 import { VerifyFontSwitcher, VERIFY_FONTS, type VerifyFont } from './components/VerifyFontSwitcher';
 import { SecondFactorToggle } from './components/SecondFactorToggle';
-import { FirmwareUpdateToggle } from './components/FirmwareUpdateToggle';
+import { FirmwareUpdateToggle, type FirmwareOutcome } from './components/FirmwareUpdateToggle';
 import { KeyboardShowcasePage, type KeyboardVariant } from './components/KeyboardShowcasePage';
 import { KeyboardDocsPanel } from './components/KeyboardDocsPanel';
 // import { PassphraseDocsPanel } from './components/PassphraseDocsPanel'; // temporarily removed per request
@@ -94,10 +94,12 @@ export default function App() {
   // Has the one-time "set up fingerprint?" prompt (after first PIN) been shown?
   const [fingerprintPrompted, setFingerprintPrompted] = useState(false);
 
-  // Firmware Update dev sim (FirmwareUpdateToggle): version-check result and
-  // the on-Continue battery check. Both default to the "happy path".
+  // Firmware Update dev sim (FirmwareUpdateToggle): the app's version-check
+  // result, the on-entry battery check, and how the transfer/verify phases
+  // end. All default to the "happy path".
   const [firmwareHasUpdate, setFirmwareHasUpdate] = useState(true);
   const [firmwareBatteryOk, setFirmwareBatteryOk] = useState(true);
+  const [firmwareOutcome, setFirmwareOutcome] = useState<FirmwareOutcome>('success');
   
   // Zoom State (100% = normal, 40% ≈ 3-inch physical size)
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -219,7 +221,9 @@ export default function App() {
       case 'firmware-info':
         return <FirmwareInfoPage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} />;
       case 'firmware-update':
-        return <FirmwareUpdatePage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} fingerprintEnrolled={fingerprintEnrolled} simulateHasUpdate={firmwareHasUpdate} simulateBatteryOk={firmwareBatteryOk} />;
+        // Keyed on the sim switches: the battery gate runs at mount, so a
+        // toggle change restarts the flow from the entry check.
+        return <FirmwareUpdatePage key={`${firmwareBatteryOk}-${firmwareHasUpdate}-${firmwareOutcome}`} onBack={() => setCurrentPage('about')} onCompleteToHome={() => setCurrentPage('home')} showDebugId={showDebugId} fingerprintEnrolled={fingerprintEnrolled} simulateHasUpdate={firmwareHasUpdate} simulateBatteryOk={firmwareBatteryOk} simulateOutcome={firmwareOutcome} />;
       case 'download-app':
         return <DownloadAppPage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} />;
       case 'reset-device':
@@ -410,7 +414,7 @@ export default function App() {
         <SecondFactorToggle enrolled={fingerprintEnrolled} onChange={(v) => { setFingerprintEnrolled(v); setFingerprintPrompted(false); }} />
       )}
 
-      {/* Firmware Update sim toggles (version check + battery check + 2nd factor) */}
+      {/* Firmware Update sim toggles (version check + battery + 2nd factor + outcome) */}
       {effectivePage === 'firmware-update' && (
         <FirmwareUpdateToggle
           hasUpdate={firmwareHasUpdate}
@@ -419,6 +423,8 @@ export default function App() {
           onBatteryOkChange={setFirmwareBatteryOk}
           enrolled={fingerprintEnrolled}
           onEnrolledChange={(v) => { setFingerprintEnrolled(v); setFingerprintPrompted(false); }}
+          outcome={firmwareOutcome}
+          onOutcomeChange={setFirmwareOutcome}
         />
       )}
 

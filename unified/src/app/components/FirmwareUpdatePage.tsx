@@ -1,40 +1,50 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import {
   ChevronLeft, ChevronRight, AlertTriangle, Check, X, Loader2,
-  Smartphone, ArrowDown, RotateCw, ShieldCheck,
+  ArrowDown, RotateCw, ShieldCheck,
 } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
 import { FingerprintVerifyPage } from './FingerprintVerifyPage';
 import { ChangePINPage } from './ChangePINPage';
 
 interface FirmwareUpdatePageProps {
+  /** User-initiated retreat (cancel / battery fail / up-to-date) → About. */
   onBack: () => void;
+  /** Update finished naturally — the device has rebooted, so land on Home,
+   *  not back inside the Settings tree (CONSTRAINTS § 7.3 dual-callback). */
+  onCompleteToHome?: () => void;
   showDebugId?: boolean;
   /** Device has a fingerprint enrolled? Drives the second factor on "Update"
    *  (fingerprint scan vs PIN keypad) — same rule as the Sign confirm. */
   fingerprintEnrolled?: boolean;
-  /** Prototype sim: did the version check find a newer firmware? */
+  /** Prototype sim: does the app report a newer firmware once linked? */
   simulateHasUpdate?: boolean;
-  /** Prototype sim: does the on-Continue battery check pass? */
+  /** Prototype sim: does the on-entry battery check pass? */
   simulateBatteryOk?: boolean;
+  /** Prototype sim: how the transfer/verify phases end. */
+  simulateOutcome?: 'success' | 'fail-transfer' | 'fail-verify';
 }
 
 // ── Bluetooth firmware-update flow (device-side screens) ──
-// The phone app does the heavy lifting (checking versions, downloading the
-// firmware blob, streaming it over BLE). The device shows passive waiting
-// states for those phases, then owns the security-critical bits: confirming
-// what it's about to receive, verifying the signature, and rebooting.
+// App-led: the wallet has no network, so the PHONE APP checks versions and
+// downloads the firmware blob BEFORE talking to the device. The device is a
+// passive receiver that owns only the security-critical bits: showing what it
+// is offered, gating the transfer behind a second factor, verifying the
+// signature BEFORE rebooting, and applying the image in the bootloader.
 //
-//   preflight → (battery-low | connect)
-//   connect → checking → (up-to-date | confirm)
-//   confirm → verify (PIN/fingerprint) → transferring → installing → restarting → success
-//   failures: battery-low | failed-connect | failed-transfer | failed-verify
+//   (entry battery check) → battery-low | waiting-app
+//   waiting-app → (up-to-date | confirm)         ← the app reports the result
+//   confirm → verify (PIN/fingerprint) → transferring → verifying
+//   verifying → restarting → boot-install → success (→ Home)
+//   failures: battery-low | failed-transfer | failed-verify
 type UpdateStep =
-  | 'preflight' | 'battery-low' | 'connect' | 'checking'
+  | 'battery-low'
+  | 'waiting-app'
   | 'up-to-date'
   | 'confirm' | 'verify'
-  | 'transferring' | 'installing' | 'restarting' | 'success'
-  | 'failed-connect' | 'failed-transfer' | 'failed-verify';
+  | 'transferring' | 'verifying'
+  | 'restarting' | 'boot-install' | 'success'
+  | 'failed-transfer' | 'failed-verify';
 
 const CURRENT_VERSION = 'v2.1.5';
 const NEW_VERSION = 'v2.2.0';
@@ -55,23 +65,27 @@ const WHATS_NEW = [
 ];
 const WN_PER_PAGE = 4;
 
-// ── Prototype simulation switches ──
-// "Has update" and "battery ok" are now driven by the FirmwareUpdateToggle dev
-// panel (props). The transfer/verify outcome stays a module constant.
-const SIMULATE_OUTCOME: 'success' | 'fail-transfer' | 'fail-verify' = 'success';
-
 const PRESS = 'active:bg-black active:text-[#838383]';
 const BTN_BASE = `h-14 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] ${PRESS} font-bold text-lg`;
 const BTN_PRIMARY = `h-14 border-2 border-black rounded-sm bg-black text-[#838383] hover:bg-[#838383] hover:text-black ${PRESS} font-bold text-lg`;
 
 export function FirmwareUpdatePage({
   onBack,
+  onCompleteToHome,
   showDebugId,
   fingerprintEnrolled = true,
   simulateHasUpdate = true,
   simulateBatteryOk = true,
+  simulateOutcome = 'success',
 }: FirmwareUpdatePageProps) {
-  const [step, setStep] = useState<UpdateStep>('preflight');
+  // The device self-checks its battery the moment the page opens (fail fast —
+  // don't let the user sit through a BLE wait only to be stopped later). An
+  // update interrupted by a dead battery risks a bricked device, so this is a
+  // hard gate, not a warning. Seeded via the initializer to avoid an extra
+  // first-frame repaint on e-ink.
+  const [step, setStep] = useState<UpdateStep>(simulateBatteryOk ? 'waiting-app' : 'battery-low');
+  // waiting-app sub-status: has the BLE link to the app come up yet?
+  const [linked, setLinked] = useState(false);
   const [progress, setProgress] = useState(0);
   const [wnPage, setWnPage] = useState(0); // "What's new" pager on the confirm screen
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -93,26 +107,14 @@ export function FirmwareUpdatePage({
 
   // ── Flow drivers ──
 
-  const startConnect = () => {
-    // The device self-checks its battery before starting. Below the safe
-    // threshold we stop here — an update interrupted by a dead battery risks a
-    // bricked device, so this is a hard gate, not a warning.
-    if (!simulateBatteryOk) {
-      setStep('battery-low');
-      return;
-    }
-    setStep('connect');
-    // Assume the device is already paired (per product decision) — just wait
-    // briefly for the app to come to the foreground and link up.
-    after(2000, startChecking);
-  };
-
-  const startChecking = () => {
-    setStep('checking');
-    after(2000, () => {
-      setStep(simulateHasUpdate ? 'confirm' : 'up-to-date');
-    });
-  };
+  // Waiting-for-app sequence: BLE link comes up, then the app (which already
+  // checked versions and downloaded the blob) reports its result.
+  useEffect(() => {
+    if (step !== 'waiting-app') return;
+    after(2500, () => setLinked(true));
+    after(4000, () => setStep(simulateHasUpdate ? 'confirm' : 'up-to-date'));
+    // Timers self-clean on unmount; step only enters 'waiting-app' once.
+  }, [step]);
 
   const startTransfer = () => {
     setStep('transferring');
@@ -123,14 +125,14 @@ export function FirmwareUpdatePage({
       setProgress((prev) => {
         const next = prev + 10;
         // Simulated mid-transfer BLE drop.
-        if (SIMULATE_OUTCOME === 'fail-transfer' && next >= 60) {
+        if (simulateOutcome === 'fail-transfer' && next >= 60) {
           clearInterval(id);
           setStep('failed-transfer');
           return prev;
         }
         if (next >= 100) {
           clearInterval(id);
-          startInstall();
+          startVerifying();
           return 100;
         }
         return next;
@@ -139,28 +141,37 @@ export function FirmwareUpdatePage({
     intervals.current.push(id);
   };
 
-  const startInstall = () => {
-    setStep('installing');
+  // Signature check happens BEFORE the reboot: if the image is bad the device
+  // must say so while it is still running the old firmware — failing inside
+  // the bootloader after a restart looks like a brick to the user.
+  const startVerifying = () => {
+    setStep('verifying');
+    after(1600, () => {
+      if (simulateOutcome === 'fail-verify') {
+        setStep('failed-verify');
+        return;
+      }
+      setStep('restarting');
+      after(2200, startBootInstall);
+    });
+  };
+
+  // Post-reboot bootloader phase: writing the verified image. Same coarse 10%
+  // progress-bar treatment (no smooth counter — e-ink, CONSTRAINTS § 1).
+  const startBootInstall = () => {
+    setStep('boot-install');
     setProgress(0);
-    // Same coarse 10% progress-bar treatment as the transfer phase (no smooth
-    // counter — e-ink, CONSTRAINTS § 1). Verifying the signature + writing the
-    // image is a measurable operation, so show real progress, not a spinner.
     const id = setInterval(() => {
       setProgress((prev) => {
         const next = prev + 10;
         if (next >= 100) {
           clearInterval(id);
-          if (SIMULATE_OUTCOME === 'fail-verify') {
-            setStep('failed-verify');
-            return prev;
-          }
-          setStep('restarting');
-          after(2500, () => setStep('success'));
+          after(600, () => setStep('success'));
           return 100;
         }
         return next;
       });
-    }, 250);
+    }, 300);
     intervals.current.push(id);
   };
 
@@ -187,6 +198,7 @@ export function FirmwareUpdatePage({
   // ── Reusable result block (success circle / failure circle) ──
   const resultScreen = (opts: {
     ok: boolean;
+    sub: string;
     title: string;
     body: string;
     primaryLabel: string;
@@ -196,7 +208,7 @@ export function FirmwareUpdatePage({
     header?: 'back' | 'static';
   }) => (
     <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-      <PageDebugId page="firmware-update" showDebugId={showDebugId} />
+      <PageDebugId page="firmware-update" subPage={opts.sub} showDebugId={showDebugId} />
       {opts.header === 'back' ? headerWithBack(onBack) : headerStatic()}
       <div className="flex-1 px-6 pt-2 pb-6 flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
@@ -226,145 +238,27 @@ export function FirmwareUpdatePage({
     </div>
   );
 
-  // ── Progress-bar screen (no back button). Shared by the transfer and
-  //    install phases so both read as the same kind of measurable operation. ──
-  const progressScreen = (icon: ReactNode, title: string, sub: string) => (
+  // ── Transient spinner screen (no back button). `bare` drops the header for
+  //    phases where the normal UI isn't running (reboot / bootloader). ──
+  const transientScreen = (icon: ReactNode, sub: string, title: string, body?: string, bare = false) => (
     <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-      <PageDebugId page="firmware-update" showDebugId={showDebugId} />
-      {headerStatic()}
-      <div className="flex-1 px-6 pt-2 pb-6 flex flex-col items-center justify-center text-center">
-        {icon}
-        <div className="text-xl font-bold text-black mb-1">{title}</div>
-        <p className="text-lg text-black mb-6 max-w-[280px] leading-snug">{sub}</p>
-
-        {/* Coarse progress bar (no transition tween — e-ink) */}
-        <div className="w-full max-w-[280px]">
-          <div className="w-full h-10 border-2 border-black rounded-sm bg-[#838383] overflow-hidden">
-            <div className="h-full bg-black" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="text-lg font-bold text-black mt-2">{progress}%</div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Transient spinner screen (no back button) ──
-  const transientScreen = (icon: ReactNode, title: string, sub?: string) => (
-    <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-      <PageDebugId page="firmware-update" showDebugId={showDebugId} />
-      {headerStatic()}
+      <PageDebugId page="firmware-update" subPage={sub} showDebugId={showDebugId} />
+      {!bare && headerStatic()}
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
         {icon}
         <div className="text-xl font-bold text-black mt-5">{title}</div>
-        {sub && <p className="text-lg text-black mt-2 max-w-[280px] leading-snug">{sub}</p>}
+        {body && <p className="text-lg text-black mt-2 max-w-[280px] leading-snug">{body}</p>}
       </div>
     </div>
   );
 
   // ════════════════════════════════════════════
-  // PREFLIGHT — pre-upgrade checklist
-  // ════════════════════════════════════════════
-  if (step === 'preflight') {
-    return (
-      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-        <PageDebugId page="firmware-update" showDebugId={showDebugId} />
-        {headerWithBack(onBack)}
-        <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
-          <h2 className="text-xl font-bold text-black mb-4">Before you update</h2>
-
-          <div className="border-4 border-black rounded-sm p-4 bg-black text-[#838383] mb-4">
-            <h3 className="text-lg font-bold flex items-center gap-1 mb-3">
-              <AlertTriangle className="w-4 h-4" strokeWidth={3} /> Make sure
-            </h3>
-            <ul className="space-y-2 text-lg">
-              <li>- Your recovery phrase is backed up</li>
-              <li>- Battery is above 50%</li>
-              <li>- Keep the device near your phone</li>
-              <li>- Do not turn off Bluetooth</li>
-            </ul>
-          </div>
-
-          <p className="text-lg text-black leading-snug">
-            The update is delivered from the SafePal app over Bluetooth. Your device will restart once it completes.
-          </p>
-
-          <div className="mt-auto space-y-3">
-            <button onClick={startConnect} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
-            <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ════════════════════════════════════════════
-  // CONNECT — wait for the phone app (already paired)
-  // ════════════════════════════════════════════
-  if (step === 'connect') {
-    return (
-      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-        <PageDebugId page="firmware-update" showDebugId={showDebugId} />
-        {headerWithBack(onBack)}
-        <div className="flex-1 px-6 pt-2 pb-6 flex flex-col">
-          <div className="flex-1 flex flex-col items-center justify-center text-center">
-            <Smartphone className="w-20 h-20 text-black mb-5" strokeWidth={1.5} />
-            <div className="text-xl font-bold text-black mb-2">Open the SafePal app</div>
-            <p className="text-lg text-black max-w-[280px] leading-snug mb-6">
-              Keep this device nearby. We're linking to your phone over Bluetooth.
-            </p>
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-5 h-5 text-black animate-spin" strokeWidth={2.5} />
-              <span className="text-lg font-bold text-black">Connecting...</span>
-            </div>
-          </div>
-          <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
-  // ════════════════════════════════════════════
-  // CHECKING — app verifies the latest version
-  // ════════════════════════════════════════════
-  if (step === 'checking') {
-    return (
-      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-        <PageDebugId page="firmware-update" showDebugId={showDebugId} />
-        {headerWithBack(onBack)}
-        <div className="flex-1 px-6 pt-2 pb-6 flex flex-col">
-          <div className="flex-1 flex flex-col items-center justify-center text-center">
-            <Loader2 className="w-16 h-16 text-black animate-spin mb-5" strokeWidth={2} />
-            <div className="text-xl font-bold text-black mb-2">Checking for updates</div>
-            <p className="text-lg text-black max-w-[280px] leading-snug">
-              The app is checking for the latest firmware.
-            </p>
-          </div>
-          <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
-  // ════════════════════════════════════════════
-  // UP-TO-DATE — no new version
-  // ════════════════════════════════════════════
-  if (step === 'up-to-date') {
-    return resultScreen({
-      ok: true,
-      header: 'back',
-      title: 'Up to date',
-      body: `You're on the latest version (${CURRENT_VERSION}). No update is needed.`,
-      primaryLabel: 'Done',
-      onPrimary: onBack,
-    });
-  }
-
-  // ════════════════════════════════════════════
-  // BATTERY-LOW — battery check on Continue failed
+  // BATTERY-LOW — on-entry battery check failed
   // ════════════════════════════════════════════
   if (step === 'battery-low') {
     return resultScreen({
       ok: false,
+      sub: 'battery',
       header: 'back',
       title: 'Battery too low',
       body: 'Charge your device above 50%, then start the update again. This keeps the update from being interrupted.',
@@ -374,12 +268,70 @@ export function FirmwareUpdatePage({
   }
 
   // ════════════════════════════════════════════
-  // CONFIRM — device shows the version it will receive
+  // WAITING-APP — the app checks + downloads; this device just listens
+  // ════════════════════════════════════════════
+  if (step === 'waiting-app') {
+    return (
+      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
+        <PageDebugId page="firmware-update" subPage="waiting" showDebugId={showDebugId} />
+        {headerWithBack(onBack)}
+        <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
+          <h2 className="text-xl font-bold text-black mb-4">Start from your phone</h2>
+
+          <div className="border-4 border-black rounded-sm p-4 bg-black text-[#838383] mb-4">
+            <h3 className="text-lg font-bold flex items-center gap-1 mb-3">
+              <AlertTriangle className="w-4 h-4" strokeWidth={3} /> Make sure
+            </h3>
+            <ul className="space-y-2 text-lg">
+              <li>- Your recovery phrase is backed up</li>
+              <li>- Keep the device near your phone</li>
+              <li>- Do not turn off Bluetooth</li>
+            </ul>
+          </div>
+
+          <p className="text-lg text-black leading-snug">
+            Open the SafePal app and tap Firmware Upgrade. The app downloads the firmware and sends it here.
+          </p>
+
+          {/* Status slot — fixed height so the text swap doesn't shift layout
+              (CONSTRAINTS § 1 fixed-height feedback slots). */}
+          <div className="flex-1 min-h-[56px] flex items-center justify-center">
+            <div className="flex items-center gap-2 text-center">
+              <Loader2 className="w-5 h-5 text-black animate-spin flex-shrink-0" strokeWidth={2.5} />
+              <span className="text-lg font-bold text-black">
+                {linked ? 'Connected. Waiting for firmware info…' : 'Waiting for the app…'}
+              </span>
+            </div>
+          </div>
+
+          <button onClick={onBack} className={`w-full ${BTN_BASE}`}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // UP-TO-DATE — the app reports no newer firmware
+  // ════════════════════════════════════════════
+  if (step === 'up-to-date') {
+    return resultScreen({
+      ok: true,
+      sub: 'latest',
+      header: 'back',
+      title: 'Up to date',
+      body: `You're on the latest version (${CURRENT_VERSION}). No update is needed.`,
+      primaryLabel: 'Done',
+      onPrimary: onBack,
+    });
+  }
+
+  // ════════════════════════════════════════════
+  // CONFIRM — device shows the version the app is offering
   // ════════════════════════════════════════════
   if (step === 'confirm') {
     return (
       <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
-        <PageDebugId page="firmware-update" showDebugId={showDebugId} />
+        <PageDebugId page="firmware-update" subPage="available" showDebugId={showDebugId} />
         {headerWithBack(onBack)}
         <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
           <h2 className="text-xl font-bold text-black mb-4">Update available</h2>
@@ -484,68 +436,101 @@ export function FirmwareUpdatePage({
   // TRANSFERRING — receiving the firmware over BLE (no back)
   // ════════════════════════════════════════════
   if (step === 'transferring') {
-    return progressScreen(
-      <ArrowDown className="w-16 h-16 text-black mb-5" strokeWidth={1.5} />,
-      'Receiving update',
-      'Keep the device near your phone. Do not power off.',
+    return (
+      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
+        <PageDebugId page="firmware-update" subPage="transfer" showDebugId={showDebugId} />
+        {headerStatic()}
+        <div className="flex-1 px-6 pt-2 pb-6 flex flex-col items-center justify-center text-center">
+          <ArrowDown className="w-16 h-16 text-black mb-5" strokeWidth={1.5} />
+          <div className="text-xl font-bold text-black mb-1">Receiving update</div>
+          <p className="text-lg text-black mb-6 max-w-[280px] leading-snug">
+            Keep the device near your phone. Do not power off.
+          </p>
+
+          {/* Coarse progress bar (no transition tween — e-ink) */}
+          <div className="w-full max-w-[280px]">
+            <div className="w-full h-10 border-2 border-black rounded-sm bg-[#838383] overflow-hidden">
+              <div className="h-full bg-black" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="text-lg font-bold text-black mt-2">{progress}%</div>
+          </div>
+        </div>
+      </div>
     );
   }
 
   // ════════════════════════════════════════════
-  // INSTALLING — verify signature + install (no back)
+  // VERIFYING — signature check BEFORE the reboot (no back)
   // ════════════════════════════════════════════
-  if (step === 'installing') {
-    return progressScreen(
-      <ShieldCheck className="w-16 h-16 text-black mb-5" strokeWidth={1.5} />,
-      'Verifying & installing',
-      'Checking the firmware signature and applying the update. Do not power off.',
+  if (step === 'verifying') {
+    return transientScreen(
+      <ShieldCheck className="w-16 h-16 text-black" strokeWidth={1.5} />,
+      'verify-fw',
+      'Verifying firmware',
+      'Checking the firmware signature before installing. Do not power off.',
     );
   }
 
   // ════════════════════════════════════════════
-  // RESTARTING — reboot to apply (no back)
+  // RESTARTING — reboot into the bootloader (no header: UI is going down)
   // ════════════════════════════════════════════
   if (step === 'restarting') {
     return transientScreen(
       <RotateCw className="w-16 h-16 text-black animate-spin" strokeWidth={2} />,
+      'boot',
       'Restarting',
-      'Your device is rebooting to finish the update.',
+      'Your device is rebooting to install the update.',
+      true,
     );
   }
 
   // ════════════════════════════════════════════
-  // SUCCESS
+  // BOOT-INSTALL — bootloader writing the verified image (bare screen)
+  // ════════════════════════════════════════════
+  if (step === 'boot-install') {
+    return (
+      <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
+        <PageDebugId page="firmware-update" subPage="boot" showDebugId={showDebugId} />
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="text-xl font-bold text-black mb-1">Installing firmware</div>
+          <div className="text-2xl font-bold text-black mb-8">{NEW_VERSION}</div>
+
+          {/* Coarse progress bar (no transition tween — e-ink) */}
+          <div className="w-full max-w-[280px]">
+            <div className="w-full h-10 border-2 border-black rounded-sm bg-[#838383] overflow-hidden">
+              <div className="h-full bg-black" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="text-lg font-bold text-black mt-2">{progress}%</div>
+          </div>
+
+          <p className="text-lg text-black mt-8">Do not power off.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // SUCCESS — device is back up on the new firmware
   // ════════════════════════════════════════════
   if (step === 'success') {
     return resultScreen({
       ok: true,
+      sub: 'success',
       header: 'static',
       title: 'Update complete',
       body: `Your device is now running ${NEW_VERSION}.`,
       primaryLabel: 'Done',
-      onPrimary: onBack,
+      onPrimary: onCompleteToHome ?? onBack,
     });
   }
 
   // ════════════════════════════════════════════
   // FAILURE SCREENS
   // ════════════════════════════════════════════
-  if (step === 'failed-connect') {
-    return resultScreen({
-      ok: false,
-      header: 'back',
-      title: "Couldn't connect",
-      body: 'We could not reach the SafePal app. Make sure the app is open and Bluetooth is on.',
-      primaryLabel: 'Retry',
-      onPrimary: startConnect,
-      secondaryLabel: 'Cancel',
-      onSecondary: onBack,
-    });
-  }
-
   if (step === 'failed-transfer') {
     return resultScreen({
       ok: false,
+      sub: 'transfer',
       header: 'back',
       title: 'Transfer interrupted',
       body: 'The update did not finish transferring. Your device is unchanged and safe to retry.',
@@ -559,9 +544,10 @@ export function FirmwareUpdatePage({
   if (step === 'failed-verify') {
     return resultScreen({
       ok: false,
+      sub: 'verify-fw',
       header: 'back',
       title: 'Verification failed',
-      body: 'The firmware signature could not be verified, so nothing was installed. Your device rolled back safely.',
+      body: `The firmware signature could not be verified. Nothing was installed — your device is unchanged and still on ${CURRENT_VERSION}.`,
       primaryLabel: 'Retry',
       onPrimary: startTransfer,
       secondaryLabel: 'Cancel',

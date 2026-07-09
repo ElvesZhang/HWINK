@@ -79,14 +79,17 @@ export const SUB_PAGE_IDS = {
     'error': 6,        // 16-6: Backup error
   },
   
-  // #18 - Firmware Update Page
+  // #18 - Firmware Update Page (app-led flow: the phone app checks/downloads,
+  // the device passively receives)
   'firmware-update': {
-    'check': 1,        // 18-1: Checking for updates
-    'available': 2,    // 18-2: Update available
-    'downloading': 3,  // 18-3: Downloading update
-    'installing': 4,   // 18-4: Installing update
-    'success': 5,      // 18-5: Update complete
-    'latest': 6,       // 18-6: Already latest version
+    'waiting': 1,      // 18-1: Waiting for the app (BLE link + firmware info)
+    'latest': 2,       // 18-2: Already latest version (app reports no update)
+    'available': 3,    // 18-3: Update available (confirm)
+    'transfer': 4,     // 18-4: Receiving firmware (+ transfer-failed)
+    'verify-fw': 5,    // 18-5: Verifying firmware signature (+ verify-failed)
+    'boot': 6,         // 18-6: Restarting + bootloader install
+    'success': 7,      // 18-7: Update complete
+    'battery': 8,      // 18-8: Battery too low (entry check failed)
   },
   
   // #20 - Reset Device Page

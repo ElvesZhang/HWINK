@@ -293,7 +293,7 @@ Steps like `saving` (loading spinner) or `signing` (sign-in-progress) don't rend
 
 **Why**: interrupting a one-way transition is a footgun. In real hardware, this would be an actual firmware operation that doesn't admit cancellation cleanly.
 
-**Applied in**: `PassphrasePageNew` (`saving`), `FirmwareUpdatePage` (`transferring` / `installing` / `restarting` — the BLE firmware delivery, signature verify, and reboot are all uninterruptible). Firmware progress is shown with a **coarse stepped bar** (10% increments, ≤10 repaints) rather than a smooth per-percent counter — continuous counters flicker on e-ink (§ 1).
+**Applied in**: `PassphrasePageNew` (`saving`), `FirmwareUpdatePage` (`transferring` / `verifying` / `restarting` / `boot-install` — the BLE firmware delivery, pre-reboot signature verify, reboot, and bootloader install are all uninterruptible). Firmware progress is shown with a **coarse stepped bar** (10% increments, ≤10 repaints) rather than a smooth per-percent counter — continuous counters flicker on e-ink (§ 1).
 
 ### 7.3 Dual completion callbacks: `onBack` vs `onCompleteToHome`
 

@@ -1,18 +1,22 @@
 import { RefreshCw, CheckCircle, BatteryFull, BatteryLow, Fingerprint, Lock } from 'lucide-react';
 
+export type FirmwareOutcome = 'success' | 'fail-transfer' | 'fail-verify';
+
 /**
  * Dev-only toggles for the Firmware Update flow (prototype simulation
  * switches). Fixed at App root outside the zoomed device frame, like the
  * Sign page's SecondFactorToggle / SignTypeSwitcher.
  *
- *  - hasUpdate  : did the version check find a newer firmware?
+ *  - hasUpdate  : does the app report a newer firmware once linked?
  *                 true  → "Update available" (confirm) screen
  *                 false → "Up to date" (no update) screen
- *  - batteryOk  : does the on-Continue battery check pass?
- *                 true  → proceed to connect
+ *  - batteryOk  : does the on-entry battery check pass?
+ *                 true  → proceed to the waiting-for-app screen
  *                 false → "Battery too low" failure screen
  *  - enrolled   : device has a fingerprint enrolled? Drives the second factor
  *                 on "Update" (fingerprint scan vs PIN keypad).
+ *  - outcome    : how the transfer/verify phases end (success / BLE drop
+ *                 mid-transfer / signature verification failure).
  */
 export function FirmwareUpdateToggle({
   hasUpdate,
@@ -21,6 +25,8 @@ export function FirmwareUpdateToggle({
   onBatteryOkChange,
   enrolled,
   onEnrolledChange,
+  outcome,
+  onOutcomeChange,
 }: {
   hasUpdate: boolean;
   onHasUpdateChange: (v: boolean) => void;
@@ -28,7 +34,14 @@ export function FirmwareUpdateToggle({
   onBatteryOkChange: (v: boolean) => void;
   enrolled: boolean;
   onEnrolledChange: (v: boolean) => void;
+  outcome: FirmwareOutcome;
+  onOutcomeChange: (v: FirmwareOutcome) => void;
 }) {
+  const OUTCOMES: { value: FirmwareOutcome; label: string }[] = [
+    { value: 'success', label: '成功' },
+    { value: 'fail-transfer', label: '传输中断' },
+    { value: 'fail-verify', label: '校验失败' },
+  ];
   return (
     <div className="fixed top-6 left-6 z-40 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 w-[190px]">
       <div className="text-xs font-bold text-gray-700 mb-2 pb-2 border-b border-gray-200">固件升级模拟</div>
@@ -43,7 +56,7 @@ export function FirmwareUpdateToggle({
         <span>{hasUpdate ? '有新版本' : '已是最新'}</span>
       </button>
 
-      <div className="text-[10px] text-gray-500 mt-3 mb-1">Continue 时的电量检查</div>
+      <div className="text-[10px] text-gray-500 mt-3 mb-1">进入页面时的电量检查</div>
       <button
         onClick={() => onBatteryOkChange(!batteryOk)}
         className={`w-full h-9 px-2.5 rounded text-xs font-bold flex items-center justify-center gap-2 transition-all ${batteryOk ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-black text-white'}`}
@@ -62,6 +75,19 @@ export function FirmwareUpdateToggle({
         {enrolled ? <Fingerprint className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
         <span>{enrolled ? '指纹验证' : 'PIN 验证'}</span>
       </button>
+
+      <div className="text-[10px] text-gray-500 mt-3 mb-1">传输/校验结果</div>
+      <div className="flex flex-col gap-1">
+        {OUTCOMES.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => onOutcomeChange(value)}
+            className={`w-full h-8 px-2.5 rounded text-xs font-bold transition-all ${outcome === value ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
