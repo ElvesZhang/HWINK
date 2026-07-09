@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import {
   ChevronLeft, AlertTriangle, Check, X, Loader2,
-  Smartphone, ArrowDown, ArrowRight, RotateCw, ShieldCheck,
+  Smartphone, ArrowDown, RotateCw, ShieldCheck,
 } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
 import { FingerprintVerifyPage } from './FingerprintVerifyPage';
@@ -342,7 +342,7 @@ export function FirmwareUpdatePage({
         <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
           <h2 className="text-xl font-bold text-black mb-4">On your phone</h2>
 
-          <div className="space-y-4">
+          <div className="space-y-5 pt-1">
             {/* Number box is 28px — the same height as one text-lg/leading-snug
                 line box (~25px) plus the 2px offset — so the first line of a
                 wrapped step stays optically centered against its number. */}
@@ -355,12 +355,6 @@ export function FirmwareUpdatePage({
               </div>
             ))}
           </div>
-
-          <div className="h-[2px] bg-black flex-shrink-0 my-4" />
-
-          <p className="text-lg font-light text-black leading-snug">
-            Tap Continue — this device will then wait for the app.
-          </p>
 
           <div className="mt-auto space-y-3">
             <button onClick={() => setStep('waiting-app')} className={`w-full ${BTN_PRIMARY}`}>Continue</button>
@@ -442,29 +436,21 @@ export function FirmwareUpdatePage({
         <div className="flex-1 px-5 pt-4 pb-6 flex flex-col">
           <h2 className="text-xl font-bold text-black mb-4">Update available</h2>
 
-          {/* Version transition is the hero — centered in the free space
-              (sign-screen big-typography language): current → NEW, with the
-              target version carrying the emphasis. */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex items-end justify-center gap-5">
-              <div>
-                <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">Current</div>
-                <div className="text-3xl font-normal text-black">{CURRENT_VERSION}</div>
-              </div>
-              <ArrowRight className="w-8 h-8 text-black mb-1 flex-shrink-0" strokeWidth={2.5} />
-              <div>
-                <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">New</div>
-                <div className="text-3xl font-bold text-black">{NEW_VERSION}</div>
-              </div>
-            </div>
+          {/* Version transition is the hero — a centered vertical stack
+              (current ↓ NEW), with the target version carrying the emphasis
+              via the size step (sign-screen big-typography language). */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center">
+            <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">Current</div>
+            <div className="text-2xl font-normal text-black">{CURRENT_VERSION}</div>
+            <ArrowDown className="w-7 h-7 text-black my-4" strokeWidth={2.5} />
+            <div className="text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5">New</div>
+            <div className="text-4xl font-bold text-black">{NEW_VERSION}</div>
           </div>
-
-          <div className="h-[2px] bg-black flex-shrink-0 mb-3" />
 
           {/* Release notes live in the app (trimmed device font subset — see
               note at top of file); the device just points there. */}
           <p className="text-lg font-light text-black leading-snug">
-            See what's new in the SafePal app.
+            View the release notes in the SafePal app.
           </p>
 
           <div className="pt-3 space-y-3">
