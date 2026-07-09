@@ -13,19 +13,23 @@
 const PRESS = 'active:bg-black active:text-[#838383]';
 const BTN_BASE = `h-14 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] ${PRESS} font-bold text-lg`;
 
+export type WordCount = 12 | 18 | 24;
+
 interface WordCountSelectorProps {
-  onSelect: (count: 12 | 24) => void;
+  onSelect: (count: WordCount) => void;
+  /** Which lengths to offer. Defaults to 12 / 18 / 24. Callers that should stay
+   *  at two options (e.g. Activation create/restore) pass their own list. */
+  counts?: WordCount[];
 }
 
-export function WordCountSelector({ onSelect }: WordCountSelectorProps) {
+export function WordCountSelector({ onSelect, counts = [12, 18, 24] }: WordCountSelectorProps) {
   return (
     <div className="space-y-3">
-      <button onClick={() => onSelect(12)} className={`w-full ${BTN_BASE}`}>
-        12 words
-      </button>
-      <button onClick={() => onSelect(24)} className={`w-full ${BTN_BASE}`}>
-        24 words
-      </button>
+      {counts.map((c) => (
+        <button key={c} onClick={() => onSelect(c)} className={`w-full ${BTN_BASE}`}>
+          {c} words
+        </button>
+      ))}
     </div>
   );
 }

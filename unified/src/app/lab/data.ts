@@ -8,7 +8,9 @@ export type LabStyle = 'poster' | 'receipt' | 'flow' | 'spread' | 'minimaldrill'
   // ── 2026-06 illustration batch — explores the illustration-aesthetic axis (see styleMeta.ts) ──
   | 'engraving' | 'pictograph' | 'woodcut' | 'infographic'
   // ── 2026-06 clean lucide-style icon experiment ──
-  | 'lineicon';
+  | 'lineicon'
+  // ── archive: frozen snapshot of the original VerifyRecoveryPageNew ──
+  | 'verifyclassic';
 
 export const WALLET = {
   name: 'ELVES-5DW',

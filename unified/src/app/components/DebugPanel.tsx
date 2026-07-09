@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { PAGE_IDS, type PageKey } from '../config/pageIds';
 import type { ActivationStep } from './ActivationPage';
 
-export type SignType = 'transfer' | 'verifyCode' | 'message' | 'blind' | 'contractCall' | 'approve' | 'approveLimit';
+// Verify Code is no longer a sign type — it is the universal first screen shown
+// before every type's content (see SignRequestPage's verify gate).
+export type SignType = 'transfer' | 'message' | 'blind' | 'contractCall' | 'approve' | 'approveLimit';
 
 type Page = 'home' | 'settings' | 'security' | 'connectivity' | 'general' | 'about'
   | 'change-pin' | 'passphrase' | 'verify-recovery' | 'fingerprint'
@@ -34,6 +36,8 @@ interface DebugPanelProps {
   onDebugNetworkChange: (network: string) => void;
   zoomLevel: number;
   onZoomLevelChange: (level: number) => void;
+  bitPreview: boolean;
+  onBitPreviewChange: (on: boolean) => void;
   showDebugId: boolean;
   onShowDebugIdChange: (show: boolean) => void;
   /** Jump to a specific step inside the activation flow. */
@@ -115,7 +119,7 @@ const pageLabels: Record<Page, string> = {
   'activation': 'Activation Flow',
 };
 
-export function DebugPanel({ currentPage, onNavigate, statusBarState, onStatusBarChange, signType, onSignTypeChange, debugNetwork, onDebugNetworkChange, zoomLevel, onZoomLevelChange, showDebugId, onShowDebugIdChange, onNavigateActivation, currentActivationStep }: DebugPanelProps) {
+export function DebugPanel({ currentPage, onNavigate, statusBarState, onStatusBarChange, signType, onSignTypeChange, debugNetwork, onDebugNetworkChange, zoomLevel, onZoomLevelChange, bitPreview, onBitPreviewChange, showDebugId, onShowDebugIdChange, onNavigateActivation, currentActivationStep }: DebugPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'pages' | 'status'>('pages');
 
@@ -517,6 +521,22 @@ export function DebugPanel({ currentPage, onNavigate, statusBarState, onStatusBa
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
                   💡 Use 40% to approximate the actual 3-inch screen size
+                </p>
+              </div>
+
+              {/* 1-bit (no anti-aliasing) preview — simulate the 2-color e-ink panel */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={bitPreview}
+                    onChange={(e) => onBitPreviewChange(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  1-bit preview (no anti-aliasing)
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  ⬛ Thresholds the screen to pure black/white like the real e-ink panel. View at 100% zoom for an accurate look (scaling re-softens edges). Approximation only — the device rasterizes with font hinting.
                 </p>
               </div>
             </div>

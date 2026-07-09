@@ -35,7 +35,7 @@ export function PassphraseDocsPanel() {
           区分大小写与空格；<code className="font-mono text-[11px]">display-passphrase</code> 用等宽字体逐字核对。无法找回——警示在 info 页讲清。
         </Rule>
         <Rule label="键盘/长度">
-          <code className="font-mono text-[11px]">mode='text'</code>（任意字符，非 BIP39 词表），上限 50 字静默截停，无实时计数。
+          <code className="font-mono text-[11px]">mode='text'</code>（任意字符，非 BIP39 词表），上限 60 字静默截停，无实时计数。
         </Rule>
         <Rule label="错误位置">
           报错显示在<strong>输入框下方</strong>——避免墨水屏整屏刷新时输入框被下推抖动。

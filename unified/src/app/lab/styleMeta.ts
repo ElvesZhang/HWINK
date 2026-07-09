@@ -252,6 +252,16 @@ export const STYLE_META: Record<LabStyle, StyleMeta> = {
       verify: ['线描盾 + 对勾图解', '复查网格 + 结果图解'],
     },
   },
+  // ── archive: frozen real-page snapshot (not a composition exploration) ──
+  verifyclassic: {
+    id: 'verifyclassic', label: '◆ Verify · 旧版存档', group: 'archive',
+    metaphor: '真机旧版存档 Archive',
+    oneLiner: 'entered 网格版（真机已换新版）',
+    cell: { home: 'placeholder', sign: 'placeholder', history: 'placeholder' },
+    annotations: {
+      verify: ['旧版快照：方框输入 + 6/页可编辑「Entered」网格 + 完整 UniversalKeyboard', '真机已替换为：线式输入 + prev/next + 专用 BIP39 键盘', '仅此屏实现，其余为占位'],
+    },
+  },
   lineicon: {
     id: 'lineicon', label: '✦ Lineicon · 线性', group: 'illus',
     metaphor: '极简线性图标 (Lucide)',
@@ -278,6 +288,7 @@ export const STYLE_ORDER: LabStyle[] = [
   'traditional', 'tradtime',
   'composite', 'editorial', 'label', 'techwear', 'hud',
   'fono', 'bento', 'serif', 'sketch', 'shadow',
+  'verifyclassic',
 ];
 
 /** Back-compat list for LabControls — [id, label] derived from the registry. */

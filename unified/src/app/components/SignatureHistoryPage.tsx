@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileSignature, Bitcoin, ArrowLeftRight, FileCode } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { SignDocsView } from './signDocsContent';
 import { TransferDetailPage } from './TransferDetailPage';
 import type { TransferDetail } from './TransferDetailPage';
 import { ApproveDetailPage } from './ApproveDetailPage';
@@ -25,6 +26,8 @@ interface SignatureRecord {
 
 interface SignatureHistoryPageProps {
   onBack: () => void;
+  /** Reports list vs which detail type so the external docs panel can follow. */
+  onDocsViewChange?: (v: SignDocsView) => void;
 }
 
 // Monochrome crypto marks — recognisable coin logos drawn 1-bit (currentColor so
@@ -124,10 +127,17 @@ const formatAmount = (amount: string): string => {
   return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
 };
 
-export function SignatureHistoryPage({ onBack }: SignatureHistoryPageProps) {
+export function SignatureHistoryPage({ onBack, onDocsViewChange }: SignatureHistoryPageProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<SignatureRecord | null>(null);
-  
+
+  // Report list vs detail (and which type) to the docs panel. record.type is
+  // already 'transfer'|'approve'|'sign'|'swap'|'blind' → 1:1 with history/* views.
+  useEffect(() => {
+    if (!onDocsViewChange) return;
+    onDocsViewChange(selectedRecord == null ? 'history/list' : (`history/${selectedRecord.type}` as SignDocsView));
+  }, [onDocsViewChange, selectedRecord]);
+
   // Mock data
   const records: SignatureRecord[] = [
     {
@@ -299,7 +309,7 @@ export function SignatureHistoryPage({ onBack }: SignatureHistoryPageProps) {
       totalUsd: totalUsd,
       timestamp: record.timestamp,
       status: record.status,
-      txHash: '0xfc4122630deafb53b46d2e1539a4cc14e6e9d1f9840a85d5af5bf1d1762f925b',
+      rawData: '0x02f8b00182012d843b9aca0085098bca5a00830186a0948ba1f109551bd432803012645ac136ddd64dba7288016345785d8a000080c080a0d7fe0212b8d4c019ae7663f1d5bc47088e20a9c9f2c71a80b4ed31055c68a924a07fe0212b8d4c019ae7663f1d5bc47088e20a9c9f2c71a80b4ed31055c68a9241',
     };
   };
 
@@ -356,8 +366,8 @@ export function SignatureHistoryPage({ onBack }: SignatureHistoryPageProps) {
       totalUsd: gasFeeUsd,
       timestamp: record.timestamp,
       status: record.status,
-      txHash: '0x24c9997adaa68b3465833fb72a70ecdf485e0e4c7bd8665fc45bebc44782c7db',
       isUnlimited: isUnlimited,
+      rawData: '0x095ea7b300000000000000000000000068b3465833fb72a70ecdf485e0e4c7bd8665fc45ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
     };
   };
 
@@ -393,7 +403,6 @@ export function SignatureHistoryPage({ onBack }: SignatureHistoryPageProps) {
       rawMessage: messageData.rawMessage,
       messageType: messageData.messageType,
       status: record.status,
-      txHash: '0xac0caf8537ed31055c68a924d7fe0212b8d4c019ae7663f1d5bc47088e20a9c1',
     };
   };
 
@@ -414,7 +423,7 @@ export function SignatureHistoryPage({ onBack }: SignatureHistoryPageProps) {
       fee: '27.5',
       feeToken: 'TRX',
       timestamp: record.timestamp,
-      txHash: '0x55c68a924d7fe0212b8d4c019ae7663f1d5bc47088e20a9c9f2c71a80b4ed310',
+      rawData: '0x38ed1739000000000000000000000000000000000000000000000000016345785d8a000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000008ba1f109551bd432803012645ac136ddd64dba72',
     };
   };
 
@@ -428,7 +437,6 @@ export function SignatureHistoryPage({ onBack }: SignatureHistoryPageProps) {
       contractAddress: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
       rawData: '0x5ae401dc0000000000000000000000000000000000000000000000000000000065f0c8e000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e404e45aaf0000000000000000000000001f9840a85d5af5bf1d1762f925bdaddc4201f984000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
       timestamp: record.timestamp,
-      txHash: '0x88e20a9c9f2c71a80b4ed31055c68a924d7fe0212b8d4c019ae7663f1d5bc470',
     };
   };
 

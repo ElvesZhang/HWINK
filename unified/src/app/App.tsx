@@ -27,17 +27,20 @@ import { PasskeyPage } from './components/PasskeyPage';
 import { SignTestPage } from './components/SignTestPage';
 import { DebugPanel } from './components/DebugPanel';
 import type { SignType } from './components/DebugPanel';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageDebugId } from './components/PageDebugId';
 import { VariantSwitcher } from './components/VariantSwitcher';
 import { SignTypeSwitcher } from './components/SignTypeSwitcher';
+import { VerifyFontSwitcher, VERIFY_FONTS, type VerifyFont } from './components/VerifyFontSwitcher';
 import { SecondFactorToggle } from './components/SecondFactorToggle';
 import { KeyboardShowcasePage, type KeyboardVariant } from './components/KeyboardShowcasePage';
 import { KeyboardDocsPanel } from './components/KeyboardDocsPanel';
-import { PassphraseDocsPanel } from './components/PassphraseDocsPanel';
+// import { PassphraseDocsPanel } from './components/PassphraseDocsPanel'; // temporarily removed per request
 import { SignDetailDocsPanel } from './components/SignDetailDocsPanel';
+import type { SignDocsView } from './components/signDocsContent';
 import { ActivationPage, type ActivationStep } from './components/ActivationPage';
 import { ActivationDocsPanel } from './components/ActivationDocsPanel';
+import { VerifyDocsPanel } from './components/VerifyDocsPanel';
 import { SandboxPage } from './sandbox/SandboxPage';
 import { LabDevice, LabControls, type LabScreen, type LabStyle } from './lab/LabPage';
 import { LabGallery } from './lab/LabGallery';
@@ -56,6 +59,12 @@ function urlInit<T extends string>(key: string, fallback: T): T {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>(() => urlInit<Page>('page', 'home'));
+  // Manual end-state for the Verify Recovery flow (driven by VerifyDocsPanel,
+  // outside the device). Mock always passes, so this is how the failure screen
+  // is reached for preview.
+  const [verifyOutcome, setVerifyOutcome] = useState<'success' | 'fail'>('success');
+  // Mock result of the passphrase re-check shown after a failed words check.
+  const [verifyPassphraseOutcome, setVerifyPassphraseOutcome] = useState<'pass' | 'fail'>('pass');
   const [nfcBackPage, setNfcBackPage] = useState<'security' | 'connectivity'>('security');
   
   // The wallet's "original" name (no passphrase derived). Used to restore the
@@ -72,7 +81,10 @@ export default function App() {
     bluetoothConnected: false,
   });
 
-  const [signType, setSignType] = useState<SignType>('transfer');
+  const [signType, setSignType] = useState<SignType>(() => urlInit<SignType>('stype', 'transfer'));
+  // Current sign screen, mirrored up from SignRequestPage / SignatureHistoryPage
+  // so the docs panel documents exactly the screen on the device.
+  const [docsView, setDocsView] = useState<SignDocsView | null>(null);
   const [debugNetwork, setDebugNetwork] = useState('');
   const [signLayoutVariant, setSignLayoutVariant] = useState<'A' | 'B' | 'C' | 'D' | 'E'>('E');
   // Device has a fingerprint enrolled? Drives the Sign confirm second factor
@@ -83,6 +95,13 @@ export default function App() {
   
   // Zoom State (100% = normal, 40% ≈ 3-inch physical size)
   const [zoomLevel, setZoomLevel] = useState(100);
+
+  // True 1-bit preview: threshold the screen to pure black/white, approximating
+  // the 2-color e-ink panel (no anti-aliasing). Toggle in DebugPanel or ?bit=1.
+  const [bitPreview, setBitPreview] = useState<boolean>(() => urlInit('bit', '') === '1');
+
+  // Dev-only: font for the big Verify Code, for comparing 1-bit legibility.
+  const [verifyFont, setVerifyFont] = useState<VerifyFont>(() => urlInit<VerifyFont>('vfont', 'default'));
 
   // Debug ID visibility
   const [showDebugId, setShowDebugId] = useState(true);
@@ -127,6 +146,12 @@ export default function App() {
   // want, but the screen always shows ActivationPage until firstBoot clears.
   const effectivePage: Page = firstBoot ? 'activation' : currentPage;
 
+  // Clear the docs view when leaving the sign-request / history pages so the
+  // panel doesn't flash a stale screen's docs on re-entry.
+  useEffect(() => {
+    if (effectivePage !== 'sign-request' && effectivePage !== 'history') setDocsView(null);
+  }, [effectivePage]);
+
   const renderPage = () => {
     switch (effectivePage) {
       case 'settings':
@@ -170,7 +195,7 @@ export default function App() {
           />
         );
       case 'verify-recovery':
-        return <VerifyRecoveryPageNew onBack={() => setCurrentPage('security')} showDebugId={showDebugId} />;
+        return <VerifyRecoveryPageNew onBack={() => setCurrentPage('security')} outcome={verifyOutcome} passphraseOutcome={verifyPassphraseOutcome} showDebugId={showDebugId} />;
       case 'fingerprint':
         return <FingerprintManagePage onBack={() => setCurrentPage('security')} showDebugId={showDebugId} />;
       case 'language':
@@ -194,9 +219,9 @@ export default function App() {
       case 'reset-device':
         return <ResetDevicePage onBack={() => setCurrentPage('about')} showDebugId={showDebugId} />;
       case 'history':
-        return <SignatureHistoryPage onBack={() => setCurrentPage('home')} />;
+        return <SignatureHistoryPage onBack={() => setCurrentPage('home')} onDocsViewChange={setDocsView} />;
       case 'sign-request':
-        return <SignRequestPage onBack={() => setCurrentPage('home')} signType={signType} debugNetwork={debugNetwork} layoutVariant={signLayoutVariant} fingerprintEnrolled={fingerprintEnrolled} fingerprintPrompted={fingerprintPrompted} onFingerprintPromptDone={(enable) => { setFingerprintPrompted(true); if (enable) { setFingerprintEnrolled(true); setCurrentPage('fingerprint'); } }} showDebugId={showDebugId} />;
+        return <SignRequestPage onBack={() => setCurrentPage('home')} signType={signType} debugNetwork={debugNetwork} layoutVariant={signLayoutVariant} fingerprintEnrolled={fingerprintEnrolled} fingerprintPrompted={fingerprintPrompted} onFingerprintPromptDone={(enable) => { setFingerprintPrompted(true); if (enable) { setFingerprintEnrolled(true); setCurrentPage('fingerprint'); } }} showDebugId={showDebugId} onDocsViewChange={setDocsView} verifyFont={verifyFont} />;
       case 'sign-test':
         return <SignTestPage onBack={() => setCurrentPage('home')} showDebugId={showDebugId} />;
       case 'keyboard-showcase':
@@ -271,17 +296,34 @@ export default function App() {
         />
       ) : (
         <div style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center', transition: 'transform 0.3s ease' }}>
+          {/* Hidden SVG filter powering the 1-bit preview: hard-threshold every
+              pixel to one of the panel's TWO tones — black ink or the #838383
+              base (0x83/255 ≈ 0.5137) — so anti-aliasing disappears but the base
+              colour is kept (not forced to white). Applied to the screen only, so
+              the bezel stays normal. View at 100% zoom — scaling re-softens edges. */}
+          <svg width="0" height="0" className="absolute" aria-hidden="true">
+            <filter id="eink-1bit" colorInterpolationFilters="sRGB">
+              <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0" />
+              <feComponentTransfer>
+                <feFuncR type="discrete" tableValues="0 0.5137" />
+                <feFuncG type="discrete" tableValues="0 0.5137" />
+                <feFuncB type="discrete" tableValues="0 0.5137" />
+              </feComponentTransfer>
+            </filter>
+          </svg>
           <DeviceFrame>
-            <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col relative">
+            <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col relative" style={{ ...(bitPreview ? { filter: 'url(#eink-1bit)' } : {}), fontFamily: VERIFY_FONTS[verifyFont].family }}>
               {renderPage()}
             </div>
           </DeviceFrame>
         </div>
       )}
 
-      {effectivePage === 'passphrase' && <PassphraseDocsPanel />}
+      {/* {effectivePage === 'passphrase' && <PassphraseDocsPanel />} — outer docs panel temporarily removed per request */}
 
-      {(effectivePage === 'sign-request' || effectivePage === 'history') && <SignDetailDocsPanel />}
+      {effectivePage === 'verify-recovery' && <VerifyDocsPanel outcome={verifyOutcome} onOutcomeChange={setVerifyOutcome} passphraseOutcome={verifyPassphraseOutcome} onPassphraseOutcomeChange={setVerifyPassphraseOutcome} />}
+
+      {(effectivePage === 'sign-request' || effectivePage === 'history') && <SignDetailDocsPanel view={docsView} />}
 
       {effectivePage === 'activation' && (
         <ActivationDocsPanel
@@ -331,6 +373,8 @@ export default function App() {
         onDebugNetworkChange={setDebugNetwork}
         zoomLevel={zoomLevel}
         onZoomLevelChange={setZoomLevel}
+        bitPreview={bitPreview}
+        onBitPreviewChange={setBitPreview}
         showDebugId={showDebugId}
         onShowDebugIdChange={setShowDebugId}
         onNavigateActivation={handleActivationNavigate}
@@ -358,6 +402,11 @@ export default function App() {
       {/* Second-factor (fingerprint vs PIN) toggle - Only on Sign Request page */}
       {effectivePage === 'sign-request' && (
         <SecondFactorToggle enrolled={fingerprintEnrolled} onChange={(v) => { setFingerprintEnrolled(v); setFingerprintPrompted(false); }} />
+      )}
+
+      {/* Verify Code font switcher - Only on Sign Request page (1-bit font compare) */}
+      {effectivePage === 'sign-request' && (
+        <VerifyFontSwitcher currentFont={verifyFont} onFontChange={setVerifyFont} />
       )}
 
       {/* Design Lab controls — OUTSIDE the device so the prototype screen stays clean */}

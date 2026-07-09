@@ -93,7 +93,7 @@ export function ActivationPage({
 }: ActivationPageProps) {
   const [step, setStep] = useState<ActivationStep>(initialStep);
   // Create-flow sub-state
-  const [wordCount, setWordCount] = useState<12 | 24>(12);
+  const [wordCount, setWordCount] = useState<12 | 18 | 24>(12);
   const [displayPage, setDisplayPage] = useState(0); // 0-based
   const [verifyIndex, setVerifyIndex] = useState(0); // 0-based word index in the verification loop
   const [verifyError, setVerifyError] = useState(false);
@@ -347,6 +347,7 @@ export function ActivationPage({
           </h2>
           <div className="mt-auto">
             <WordCountSelector
+              counts={[12, 24]}
               onSelect={(count) => {
                 setWordCount(count);
                 setDisplayPage(0);

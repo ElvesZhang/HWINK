@@ -1,4 +1,5 @@
-import type { LucideIcon } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
 
 /**
  * Generic docs-panel shell. Sits to the right of the device frame and
@@ -152,6 +153,38 @@ export function DocTable({
         ))}
       </tbody>
     </table>
+  );
+}
+
+/** Collapsible section: a chevron + bold title header that toggles its body.
+ *  Hand-rolled (not Radix) to match the panel's plain styling. Each instance
+ *  owns its open state; remount (via a parent `key`) to reset to defaultOpen. */
+export function Collapsible({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-t border-gray-200 first:border-t-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-1.5 py-2 text-left"
+        aria-expanded={open}
+      >
+        {open ? (
+          <ChevronDown className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        )}
+        <span className="text-sm font-bold text-gray-900">{title}</span>
+      </button>
+      {open && <div className="pb-3 pl-1">{children}</div>}
+    </div>
   );
 }
 

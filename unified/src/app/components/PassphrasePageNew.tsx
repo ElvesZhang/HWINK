@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronLeft, AlertTriangle, Check, X, Loader2 } from 'lucide-react';
+import { ChevronLeft, AlertTriangle, Check, Loader2 } from 'lucide-react';
 import { UniversalKeyboard } from './UniversalKeyboard';
 import { PINKeypad } from './PINKeypad';
+import { DeviceInput } from './DeviceInput';
 
 interface PassphrasePageNewProps {
   onBack: () => void;
@@ -36,6 +37,9 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 'enable' = set a new passphrase; 'restore' = explicitly switch back to the
+  // original (empty-passphrase) wallet. Chosen on the info screen.
+  const [intent, setIntent] = useState<'enable' | 'restore'>('enable');
 
   // Simulated async submit — gives the UI a real "verifying..." moment so we
   // can later swap in the real firmware call without changing the visual shape.
@@ -50,11 +54,28 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
 
   // --- Handlers ---
 
+  // Restore the original recovery-phrase wallet (empty passphrase). Same end
+  // result as confirming an empty passphrase: brief saving spinner → success
+  // ("Original wallet restored") → Home. passphrase stays '' so the success
+  // screen renders the original-wallet copy.
+  const restoreOriginal = () => {
+    setPassphrase('');
+    setStep('saving');
+    setTimeout(() => {
+      setStep('success');
+      setTimeout(() => {
+        if (onCompleteToHome) onCompleteToHome('');
+        else onBack();
+      }, 2000);
+    }, 2000);
+  };
+
   const handlePINSubmit = () => {
     if (pin.length === 6) {
       submitWithPending(() => {
-        setStep('input');
         setError('');
+        if (intent === 'restore') restoreOriginal();
+        else setStep('input');
       });
     }
   };
@@ -124,26 +145,6 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
   // continuous updates on an e-ink screen cause flicker / partial refreshes.
   // The clear button is vertically centred (`inset-y-0 my-auto`) so it stays
   // mid-line whether the value is one row or wraps to multiple rows.
-  const renderInputField = (
-    value: string,
-    onClear: () => void
-  ) => (
-    <div className="relative mb-3">
-      <div className="min-h-14 border-2 border-black rounded-sm bg-[#838383] flex items-start px-3 py-2 pr-12">
-        <span className="text-lg font-bold text-black flex-1 break-all">{value || ' '}</span>
-      </div>
-      {value && (
-        <button
-          onClick={onClear}
-          aria-label="Clear"
-          className={`absolute inset-y-0 my-auto right-2 w-8 h-8 rounded-full border-2 border-black bg-[#838383] flex items-center justify-center hover:bg-black hover:text-[#838383] ${PRESS}`}
-        >
-          <X className="w-4 h-4" strokeWidth={3} />
-        </button>
-      )}
-    </div>
-  );
-
   // === SUCCESS SCREENS ===
 
   if (step === 'success') {
@@ -173,35 +174,30 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
     return (
       <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
         {renderHeader('Passphrase', onBack)}
-        <div className="flex-1 p-5 flex flex-col overflow-y-auto">
-          <h2 className="text-xl font-bold text-black mb-2">Passphrase</h2>
-
-          <div className="space-y-3 mb-4">
-            <div>
-              <h3 className="text-lg font-bold text-black mb-1">What is it?</h3>
-              <p className="text-lg text-black leading-snug">
-                An extra secret combined with your recovery phrase during key derivation. Each passphrase derives an entirely separate wallet.
-              </p>
-            </div>
-            <div className="border-4 border-black rounded-sm p-4 bg-black text-[#838383]">
-              <h3 className="text-lg font-bold flex items-center gap-1 mb-2">
-                <AlertTriangle className="w-4 h-4" strokeWidth={3} /> Critical information
-              </h3>
-              <ul className="space-y-2 text-lg">
-                <li>- Different passphrase = different wallet</li>
-                <li>- Lost passphrase = lost all funds</li>
-                <li>- Must be stored separately from your recovery phrase</li>
-                <li>- Cannot be recovered if forgotten</li>
-              </ul>
-            </div>
+        <div className="flex-1 p-5 flex flex-col">
+          <h2 className="text-xl font-bold text-black mb-2">Add a passphrase?</h2>
+          <p className="text-lg text-black leading-snug">
+            An extra secret added to your recovery phrase. Each passphrase opens a separate wallet.
+          </p>
+          <div className="mt-4 border-2 border-black rounded-sm bg-black text-[#838383] p-4 flex items-start gap-2">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" strokeWidth={3} />
+            <p className="text-lg leading-snug">If you forget it, that wallet's funds are lost — it can't be recovered.</p>
           </div>
 
-          <button
-            onClick={() => setStep('pin')}
-            className={`mt-auto ${BTN_BASE}`}
-          >
-            I Understand
-          </button>
+          <div className="mt-auto space-y-3">
+            <button
+              onClick={() => { setIntent('enable'); setStep('pin'); }}
+              className={`w-full ${BTN_BASE}`}
+            >
+              Enable
+            </button>
+            <button
+              onClick={() => { setIntent('restore'); setStep('pin'); }}
+              className={`w-full ${BTN_BASE}`}
+            >
+              Don't enable
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -216,6 +212,9 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
         <div className="flex-1 p-5 flex flex-col">
           <div className="mb-2">
             <h2 className="text-xl font-bold text-black">Enter your device PIN</h2>
+            {intent === 'restore' && (
+              <p className="text-lg text-black mt-1">To switch back to your original wallet.</p>
+            )}
           </div>
           {/* Fixed-height feedback slot so the keypad below never shifts when
              error / loading state appears (e-ink: avoid moving the focused area). */}
@@ -256,33 +255,21 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
           () => step === 'input' ? setStep('pin') : setStep('input')
         )}
         <div className="flex-1 p-5 pb-[220px] flex flex-col">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-black">
-              {step === 'input' ? 'Enter your passphrase' : 'Confirm your passphrase'}
-            </h2>
-            <p className="text-lg text-black mt-2">
-              {step === 'input'
-                ? 'Up to 50 characters.'
-                : 'Type the same passphrase again to confirm'
-              }
-            </p>
-          </div>
-
-          {renderInputField(currentValue, () => { setValue(''); setError(''); })}
+          <DeviceInput
+            value={currentValue}
+            label={step === 'input' ? 'Enter your passphrase' : 'Confirm your passphrase'}
+            hint={error
+              ? undefined
+              : step === 'input'
+                ? 'Up to 60 characters.'
+                : 'Re-type it exactly — case and spaces included.'}
+            onClear={() => { setValue(''); setError(''); }}
+          />
 
           {error && (
-            <div className="text-lg text-black font-bold flex items-center gap-1 mb-2">
+            <div className="mt-3 text-lg text-black font-bold flex items-center gap-1">
               <AlertTriangle className="w-4 h-4" strokeWidth={3} /> {error}
             </div>
-          )}
-
-          {/* No tip box on the input step — the no-recovery warning already ran
-              on the intro screen, and the freed space keeps the input clear of
-              the keyboard. The confirm step keeps its one-line match rule. */}
-          {step === 'confirm' && (
-            <p className="mt-auto mb-2 text-lg text-black leading-snug">
-              Must match the previous entry exactly, including case and spaces.
-            </p>
           )}
         </div>
 
@@ -290,7 +277,7 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
           key={step}
           value={currentValue}
           onChange={(val) => {
-            if (val.length <= 50) {
+            if (val.length <= 60) {
               setValue(val);
               setError('');
             }
@@ -376,17 +363,15 @@ export function PassphrasePageNew({ onBack, onCompleteToHome }: PassphrasePageNe
         {/* Back goes to display-passphrase (skip transient saving step) */}
         {renderHeader('Wallet Name', () => setStep('display-passphrase'))}
         <div className="flex-1 p-5 pb-[220px] flex flex-col">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-black">Name your wallet</h2>
-            <p className="text-lg text-black mt-2">
-              Stored only on this device. Use it to tell your main wallet apart from passphrase wallets.
-            </p>
-          </div>
-
-          {renderInputField(walletName, () => { setWalletName(''); setError(''); })}
+          <DeviceInput
+            value={walletName}
+            label="Name your wallet"
+            hint={error ? undefined : 'Stored on this device, to tell your wallets apart.'}
+            onClear={() => { setWalletName(''); setError(''); }}
+          />
 
           {error && (
-            <div className="text-lg text-black font-bold flex items-center gap-1 mb-2">
+            <div className="mt-3 text-lg text-black font-bold flex items-center gap-1">
               <AlertTriangle className="w-4 h-4" strokeWidth={3} /> {error}
             </div>
           )}

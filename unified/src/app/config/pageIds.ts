@@ -116,8 +116,7 @@ export const SUB_PAGE_IDS = {
 
   // #22 - Sign Request Page
   'sign-request': {
-    'transfer': 1,         // 22-1: Transfer request
-    'verifyCode': 2,       // 22-2: Transfer with verify code
+    'transfer': 1,         // 22-1: Transfer request (verify code is the shared first screen for all types)
     'message': 3,          // 22-3: Message signing
     'blind': 5,            // 22-5: Blind signing
     'contractCall': 7,     // 22-7: Contract call (Swap)

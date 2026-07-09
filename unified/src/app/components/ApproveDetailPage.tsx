@@ -16,8 +16,9 @@ export interface ApproveDetail {
   totalUsd: string;
   timestamp: string;
   status: 'completed' | 'rejected';
-  txHash?: string;
   isUnlimited?: boolean;
+  /** Serialized signed payload (raw approve calldata). Trailing flow field. */
+  rawData?: string;
 }
 
 interface ApproveDetailPageProps {
@@ -34,27 +35,27 @@ export function ApproveDetailPage({ onBack, detail }: ApproveDetailPageProps) {
     {
       label: 'Approved Amount',
       value: detail.isUnlimited
-        ? <div className="text-2xl font-normal text-black">UNLIMITED</div>
+        ? <div className="text-xl font-normal text-black">UNLIMITED</div>
         : <PreciseAmount amount={detail.amount} token={detail.coin} />,
     },
-    { label: 'Token', value: <div className="text-2xl font-normal text-black">{detail.coin} ({detail.network})</div> },
+    { label: 'Token', value: <div className="text-xl font-normal text-black">{detail.coin} ({detail.network})</div> },
     {
       label: 'Spender',
       value: (
         <>
           {detail.spenderName && <div className="text-xl font-normal text-black break-all leading-snug mb-1">{detail.spenderName}</div>}
-          <BoldEndsAddress addr={detail.spender} className="text-xl text-black font-mono break-all leading-snug" />
+          <BoldEndsAddress addr={detail.spender} className="text-xl text-black break-all leading-snug" />
         </>
       ),
     },
     ...(detail.address
-      ? [{ label: 'Your Address', value: <BoldEndsAddress addr={detail.address} className="text-xl text-black font-mono break-all leading-snug" /> }]
+      ? [{ label: 'Your Address', value: <BoldEndsAddress addr={detail.address} className="text-xl text-black break-all leading-snug" /> }]
       : []),
-    { label: 'Gas Limit', value: <div className="text-2xl font-normal text-black font-mono">{detail.gasLimit}</div> },
-    { label: 'Network Fee', value: <div className="text-2xl font-normal text-black font-mono break-all">{detail.gasFee} ETH</div> },
-    // Type-specific extras beyond the signing-time set: the broadcast receipt.
-    ...(detail.txHash
-      ? [{ label: 'Transaction Hash', value: <div className="text-xl font-normal text-black font-mono break-all leading-snug">{detail.txHash}</div> }]
+    { label: 'Gas Limit', value: <div className="text-xl font-normal text-black">{detail.gasLimit}</div> },
+    { label: 'Network Fee', value: <div className="text-xl font-normal text-black break-all">{detail.gasFee} ETH</div> },
+    // Raw signed payload — flow field, always last.
+    ...(detail.rawData
+      ? [{ label: 'Raw Data', flow: true, value: <div className="text-xl font-normal text-black break-all leading-snug">{detail.rawData}</div> }]
       : []),
   ];
 

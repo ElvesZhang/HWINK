@@ -21,9 +21,9 @@ import { useState, useRef, useEffect, type ReactNode } from 'react';
 
 export interface DetailField {
   label: string;
-  /** Fully-styled value node. Use the value classes from the spec:
-   *  plain → text-2xl font-normal; long/mono → text-xl font-mono; amounts →
-   *  <PreciseAmount/>; addresses → <BoldEndsAddress/>. */
+  /** Fully-styled value node. All detail values use one uniform style:
+   *  text-xl font-normal (20px), sans (no mono) — amounts → <PreciseAmount/>,
+   *  addresses → <BoldEndsAddress/> (bold ends only, still sans). */
   value: ReactNode;
   /** Long text block (full message, raw calldata). At most one per view and it
    *  must be the LAST field. Its value flows across pages via internal scroll
@@ -40,14 +40,14 @@ const LABEL = 'text-lg font-light text-black uppercase tracking-wide leading-non
 const LABEL_MB = 6; // mb-1.5 below the label (not counted in offsetHeight)
 
 /** Full-precision amount. A signing screen must never round, so every decimal
- *  stays visible — the number renders as one uniform value-style span (24px
- *  normal, same as other detail values) and wraps via break-all when long. */
+ *  stays visible — the number renders as one uniform value-style span (20px
+ *  normal, same as every other detail value) and wraps via break-all when long. */
 export function PreciseAmount({ amount, token, network }: { amount: string; token?: string; network?: string }) {
   return (
     <div className="flex items-baseline gap-x-2 flex-wrap leading-tight tabular-nums">
-      <span className="text-2xl font-normal text-black tracking-tight break-all">{amount}</span>
+      <span className="text-xl font-normal text-black tracking-tight break-all">{amount}</span>
       {token && (
-        <span className="text-lg font-normal text-black uppercase whitespace-nowrap">
+        <span className="text-xl font-normal text-black uppercase whitespace-nowrap">
           {token}{network ? ` (${network})` : ''}
         </span>
       )}
@@ -119,6 +119,13 @@ export function DetailListView({ title, onBack, fields, dataKey }: DetailListVie
       const fixedH = kids.slice(0, n).map(k => k.offsetHeight);
       const hLabel = (kids[n]?.offsetHeight || 0) + LABEL_MB;
       const hValue = kids[n + 1]?.offsetHeight || 0;
+      // Line height of the flow value. The flow viewports (vp0/vp1) are snapped
+      // DOWN to whole-line multiples so a line is never clipped across a page
+      // boundary — both the box height and the translateY offset land on a line.
+      const flowValueEl = (kids[n + 1]?.firstElementChild as HTMLElement) || kids[n + 1];
+      const lhRaw = flowValueEl ? parseFloat(getComputedStyle(flowValueEl).lineHeight) : NaN;
+      const lh = Number.isFinite(lhRaw) && lhRaw > 0 ? lhRaw : 28;
+      const snapLines = (v: number) => Math.max(lh, Math.floor(v / lh) * lh);
       const sumFixed = fixedH.reduce((a, b) => a + b, 0) + GAP * Math.max(0, n - 1);
       if (sumFixed + (n > 0 ? GAP : 0) + hLabel + hValue <= full) {
         setFlow({ total: 1, fixedPages: [], vp0: 0, vp1: 0 }); // everything fits on one page
@@ -139,8 +146,8 @@ export function DetailListView({ title, onBack, fields, dataKey }: DetailListVie
         if (!fixedPages.length) fixedPages.push([]);            // flow-only view
         const lastLen = fixedPages[fixedPages.length - 1].length;
         const room = avail - accF - (lastLen ? GAP : 0) - hLabel - 4;
-        const vp0 = room >= 100 ? room : 0;                     // flow start on the last fixed page
-        const vp1 = Math.max(60, avail - hLabel - 4);           // flow viewport on later pages
+        const vp0 = room >= 100 ? snapLines(room) : 0;          // flow start on the last fixed page (whole lines)
+        const vp1 = snapLines(Math.max(60, avail - hLabel - 4)); // flow viewport on later pages (whole lines)
         const rest = Math.max(0, hValue - vp0);
         const extra = vp0 > 0 ? Math.ceil(rest / vp1) : Math.max(1, Math.ceil(hValue / vp1));
         setFlow({ total: fixedPages.length + extra, fixedPages, vp0, vp1 });

@@ -28,6 +28,7 @@ import { EngravingStyle } from './styles/engraving';
 import { WoodcutStyle } from './styles/woodcut';
 import { InfographicStyle } from './styles/infographic';
 import { LineiconStyle } from './styles/lineicon';
+import { VerifyClassicStyle } from './styles/verify-classic';
 import { STYLE_ORDER, STYLE_META, styleNo } from './styleMeta';
 
 /**
@@ -114,6 +115,7 @@ export function LabDevice({ screen, style }: { screen: LabScreen; style: LabStyl
       {style === 'woodcut' && <WoodcutStyle screen={screen} />}
       {style === 'infographic' && <InfographicStyle screen={screen} />}
       {style === 'lineicon' && <LineiconStyle screen={screen} />}
+      {style === 'verifyclassic' && <VerifyClassicStyle screen={screen} />}
     </div>
   );
 }

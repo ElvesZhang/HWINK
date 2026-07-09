@@ -12,7 +12,6 @@ export interface SignMessageDetail {
   rawMessage: string;
   messageType: 'text' | 'hex';
   status: 'completed' | 'rejected';
-  txHash?: string;
 }
 
 interface SignMessageDetailPageProps {
@@ -32,21 +31,18 @@ export function SignMessageDetailPage({ onBack, detail }: SignMessageDetailPageP
   // Network / Signing Address / Message) — the history detail only ADDS Time.
   const fields: DetailField[] = [
     { label: 'Time', value: <div className="text-xl font-normal text-black">{detail.timestamp}</div> },
-    { label: 'DApp', value: <div className="text-2xl font-normal text-black break-all">{detail.requestedByName || 'Unknown'}</div> },
+    { label: 'DApp', value: <div className="text-xl font-normal text-black break-all">{detail.requestedByName || 'Unknown'}</div> },
     ...(detail.url
       ? [{ label: 'URL', value: <div className="text-xl font-normal text-black break-all leading-snug">{detail.url}</div> }]
       : []),
-    { label: 'Network', value: <div className="text-2xl font-normal text-black">{detail.network}</div> },
-    { label: 'Signing Address', value: <BoldEndsAddress addr={detail.requestedBy} className="text-xl text-black font-mono break-all leading-snug" /> },
+    { label: 'Network', value: <div className="text-xl font-normal text-black">{detail.network}</div> },
+    { label: 'Signing Address', value: <BoldEndsAddress addr={detail.requestedBy} className="text-xl text-black break-all leading-snug" /> },
     // Type-specific extras beyond the signing-time set.
-    { label: 'Message Type', value: <div className="text-2xl font-normal text-black uppercase">{detail.messageType === 'hex' ? 'Hexadecimal Data' : 'Plain Text'}</div> },
-    ...(detail.txHash
-      ? [{ label: 'Signature Hash', value: <div className="text-xl font-normal text-black font-mono break-all leading-snug">{detail.txHash}</div> }]
-      : []),
+    { label: 'Message Type', value: <div className="text-xl font-normal text-black uppercase">{detail.messageType === 'hex' ? 'Hexadecimal Data' : 'Plain Text'}</div> },
     {
       label: 'Message',
       flow: true,
-      value: <div className={`text-xl font-normal text-black ${detail.messageType === 'hex' ? 'font-mono' : ''} whitespace-pre-wrap break-all leading-snug`}>{formattedMessage}</div>,
+      value: <div className="text-xl font-normal text-black whitespace-pre-wrap break-all leading-snug">{formattedMessage}</div>,
     },
   ];
 

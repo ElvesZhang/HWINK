@@ -9,7 +9,6 @@ interface SignTypeSwitcherProps {
 
 const signTypeLabels: Record<SignType, string> = {
   transfer: 'Transfer',
-  verifyCode: 'Verify Code',
   approve: 'Approve',
   approveLimit: 'Approve Limit',
   message: 'Message',
@@ -20,7 +19,7 @@ const signTypeLabels: Record<SignType, string> = {
 export function SignTypeSwitcher({ currentType, onTypeChange }: SignTypeSwitcherProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const signTypes: SignType[] = ['transfer', 'verifyCode', 'approve', 'approveLimit', 'message', 'blind', 'contractCall'];
+  const signTypes: SignType[] = ['transfer', 'approve', 'approveLimit', 'message', 'blind', 'contractCall'];
 
   return (
     <div className="fixed bottom-24 right-24 z-40">
