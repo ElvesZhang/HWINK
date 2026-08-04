@@ -20,37 +20,46 @@ import { FingerprintVerifyPage } from './FingerprintVerifyPage';
 //  buttons on the list stand in for that transport.
 // ════════════════════════════════════════════════════════════════════════
 
+// Fields follow the standards inventory in PASSKEY_DEVICE_DATA.md: everything
+// shown is data a FIDO2 authenticator actually stores for a discoverable
+// credential. Deliberately absent: created/last-used timestamps (no RTC, no
+// protocol field) and a sign counter (not in the credMgmt surface; storage
+// granularity is implementation-defined and may be always-zero).
 interface Passkey {
   id: string;
-  rpName: string;   // human name of the relying party
-  rpId: string;     // domain
-  user: string;     // user handle shown to the user
-  created: string;
-  lastUsed: string;
-  signCount: number;
-  credId: string;   // credential id (shortened, grouped hex)
+  rpName: string;      // rp.name — human name of the relying party (optional in spec)
+  rpId: string;        // rp.id — domain, the credential's true home
+  user: string;        // user.name — account identifier
+  displayName: string; // user.displayName — human name for the account
+  algorithm: string;   // COSE key algorithm of the credential key pair
+  uvRequired: boolean; // credProtect level 3 (always require user verification)?
+  credId: string;      // credential id (shortened, grouped hex)
 }
+
+// Device capacity — getCredsMetadata / remainingDiscoverableCredentials are
+// first-class in CTAP2.1, so the UI surfaces "used of max" directly.
+const MAX_PASSKEYS = 25;
 
 const INITIAL_PASSKEYS: Passkey[] = [
   {
     id: '1', rpName: 'GitHub', rpId: 'github.com', user: 'elves-dev',
-    created: '2026-03-18 09:42', lastUsed: '2026-06-08 21:15', signCount: 34,
+    displayName: 'Elves Zhang', algorithm: 'ES256', uvRequired: true,
     credId: '9F2C71A80B4ED31055C68A924D7FE021',
   },
   {
     id: '2', rpName: 'Google', rpId: 'google.com', user: 'elves@gmail.com',
-    created: '2026-04-02 14:05', lastUsed: '2026-06-10 08:30', signCount: 58,
+    displayName: 'Elves Zhang', algorithm: 'Ed25519', uvRequired: true,
     credId: '2B8D4C019AE7663F1D5BC47088E20A9C',
   },
   {
     id: '3', rpName: 'Binance', rpId: 'binance.com', user: 'elves_hw',
-    created: '2026-05-21 19:48', lastUsed: '2026-06-05 12:02', signCount: 7,
+    displayName: 'Elves', algorithm: 'ES256', uvRequired: false,
     credId: 'E4107BC923D6F58A0C1E92B76A44D803',
   },
 ];
 
 // Incoming registration request (what the host would send over BLE/NFC/USB).
-const REGISTER_REQUEST = { rpName: 'WebAuthn Demo', rpId: 'demo.webauthn.io', user: 'elves' };
+const REGISTER_REQUEST = { rpName: 'WebAuthn Demo', rpId: 'demo.webauthn.io', user: 'elves', displayName: 'Elves' };
 
 type View = 'list' | 'detail' | 'delete' | 'register' | 'auth' | 'verify' | 'success';
 
@@ -98,18 +107,16 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
                 rpName: REGISTER_REQUEST.rpName,
                 rpId: REGISTER_REQUEST.rpId,
                 user: REGISTER_REQUEST.user,
-                created: '2026-06-11 09:00',
-                lastUsed: '2026-06-11 09:00',
-                signCount: 0,
+                displayName: REGISTER_REQUEST.displayName,
+                algorithm: 'ES256',
+                uvRequired: true,
                 credId: '7A55D2C480FE19B36C0D81E54F2A9B67',
               },
               ...prev,
             ]);
-          } else if (pending === 'auth') {
-            setPasskeys(prev => prev.map(p => p.id === authKey.id
-              ? { ...p, signCount: p.signCount + 1, lastUsed: '2026-06-11 09:00' }
-              : p));
           }
+          // Sign-in leaves the stored credential unchanged — the device keeps
+          // no per-use state (no timestamps, no exposed counter).
           setView('success');
         }}
         showDebugId={showDebugId}
@@ -303,16 +310,16 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
             <div className="text-2xl font-normal text-black break-all">{selected.user}</div>
           </div>
           <div>
-            <div className={LABEL}>Created</div>
-            <div className="text-xl font-normal text-black">{selected.created}</div>
+            <div className={LABEL}>Display Name</div>
+            <div className="text-2xl font-normal text-black break-all">{selected.displayName}</div>
           </div>
           <div>
-            <div className={LABEL}>Last Used</div>
-            <div className="text-xl font-normal text-black">{selected.lastUsed}</div>
+            <div className={LABEL}>Key Algorithm</div>
+            <div className="text-xl font-normal text-black font-mono">{selected.algorithm}</div>
           </div>
           <div>
-            <div className={LABEL}>Sign Count</div>
-            <div className="text-2xl font-normal text-black tabular-nums">{selected.signCount}</div>
+            <div className={LABEL}>User Verification</div>
+            <div className="text-xl font-normal text-black">{selected.uvRequired ? 'Always required' : 'Optional'}</div>
           </div>
           <div>
             <div className={LABEL}>Credential ID</div>
@@ -341,7 +348,9 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
         {/* Status — flat field */}
         <div className="mb-4">
           <div className={LABEL}>Authenticator</div>
-          <div className="text-2xl font-normal text-black">FIDO2 · {passkeys.length} passkeys</div>
+          {/* Capacity is first-class in CTAP2.1 (getCredsMetadata), so show
+              used-of-max rather than a bare count. */}
+          <div className="text-2xl font-normal text-black">FIDO2 · {passkeys.length} of {MAX_PASSKEYS} passkeys</div>
         </div>
 
         {/* Registered passkeys — interactive menu cards */}

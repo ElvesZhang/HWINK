@@ -84,11 +84,12 @@
 
 ## 7. 对现有 `PasskeyPage` 的映射结论
 
-- **删**：`created` / `lastUsed`（§ 5，本设备无 RTC）。
-- **Sign Count**：非标准保证（§ 5）。可选：删除，或保留并接受"厂商自定实现"的定位。
+- **删**：`created` / `lastUsed`（§ 5，本设备无 RTC）。【已执行】
+- **Sign Count**：非标准保证（§ 5）。**决策：删除**。【已执行】
 - **保留**：Service(rp.id) / Username(user.name) / Credential ID —— 全部有据。
-- **可增**（全部有据）：rp.name 与 rp.id 分行；user.displayName；算法名；
-  credProtect 徽章；列表页容量行（已存 N / 剩余 M）；按 RP 分组。
+- **已增**：user.displayName、Key Algorithm、User Verification（credProtect）、
+  列表页容量（`N of 25 passkeys`，MAX_PASSKEYS 为原型 mock）。
+  未做：按 RP 分组（3 条演示数据无分组价值，实机数据多时再议）。
 
 ---
 *核实途径备注：FIDO 官网规范正文在当前网络代理下 403，字段核实采用 Yubico
