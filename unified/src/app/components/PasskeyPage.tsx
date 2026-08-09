@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, X, Trash2, KeyRound } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, X, Trash2, KeyRound } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
 import { FingerprintVerifyPage } from './FingerprintVerifyPage';
 
@@ -40,6 +40,9 @@ interface Passkey {
 // first-class in CTAP2.1, so the UI surfaces "used of max" directly.
 const MAX_PASSKEYS = 25;
 
+// 10 entries on purpose — enough to exercise the list pagination (4 per page
+// → 3 pages). Includes two accounts on the same RP (github.com) since that is
+// the case grouping/sorting has to keep legible.
 const INITIAL_PASSKEYS: Passkey[] = [
   {
     id: '1', rpName: 'GitHub', rpId: 'github.com', user: 'elves-dev',
@@ -56,7 +59,45 @@ const INITIAL_PASSKEYS: Passkey[] = [
     displayName: 'Elves', algorithm: 'ES256', uvRequired: false,
     credId: 'E4107BC923D6F58A0C1E92B76A44D803',
   },
+  {
+    id: '4', rpName: 'GitHub', rpId: 'github.com', user: 'elves-work',
+    displayName: 'Elves Zhang', algorithm: 'ES256', uvRequired: true,
+    credId: '5D0A98C2E17F44B6A3C58D10F92E67B4',
+  },
+  {
+    id: '5', rpName: 'Apple', rpId: 'apple.com', user: 'elves@icloud.com',
+    displayName: 'Elves Zhang', algorithm: 'ES256', uvRequired: true,
+    credId: '81C4F0A2D95E36B7C10D84F26A93E5D0',
+  },
+  {
+    id: '6', rpName: 'Microsoft', rpId: 'microsoft.com', user: 'elves@outlook.com',
+    displayName: 'Elves Zhang', algorithm: 'ES256', uvRequired: true,
+    credId: '3E92B7D014C6F85A2B7E10C94D58A36F',
+  },
+  {
+    id: '7', rpName: 'Coinbase', rpId: 'coinbase.com', user: 'elves_cb',
+    displayName: 'Elves', algorithm: 'Ed25519', uvRequired: true,
+    credId: 'A70D3F92E14B86C5D20A97E31F64B8C2',
+  },
+  {
+    id: '8', rpName: 'Kraken', rpId: 'kraken.com', user: 'elves_kr',
+    displayName: 'Elves', algorithm: 'ES256', uvRequired: false,
+    credId: '6B18E4D0A92C57F3B84D20E16C95A7F4',
+  },
+  {
+    id: '9', rpName: 'Cloudflare', rpId: 'cloudflare.com', user: 'elves@hwink.dev',
+    displayName: 'Elves Zhang', algorithm: 'ES256', uvRequired: true,
+    credId: 'C25A80F14E96D3B7A08C52F49E17D6B3',
+  },
+  {
+    id: '10', rpName: 'Proton', rpId: 'proton.me', user: 'elves@proton.me',
+    displayName: 'Elves', algorithm: 'Ed25519', uvRequired: true,
+    credId: 'F49C16E8B03D72A5C96E48B20D51A7E9',
+  },
 ];
+
+// Whole-card pagination, 4 cards per page — same pattern as Sign History.
+const KEYS_PER_PAGE = 4;
 
 // Incoming registration request (what the host would send over BLE/NFC/USB).
 const REGISTER_REQUEST = { rpName: 'WebAuthn Demo', rpId: 'demo.webauthn.io', user: 'elves', displayName: 'Elves' };
@@ -76,12 +117,24 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Which request the verify step belongs to. */
   const [pending, setPending] = useState<'register' | 'auth' | null>(null);
+  /** List pagination (whole cards, Sign History pattern). */
+  const [listPage, setListPage] = useState(0);
   /** Which credential an auth request uses (first one in the demo). */
   const authKey = passkeys[0];
   const selected = passkeys.find(p => p.id === selectedId) || null;
 
-  const header = (title: string, back?: () => void) => (
-    <div className="h-[45px] px-5 flex items-center border-b-2 border-black flex-shrink-0">
+  // Display order: alphabetical by rp.id, then account name. The device has no
+  // timestamps (PASSKEY_DEVICE_DATA.md § 5) and CTAP leaves enumeration order
+  // undefined, so alphabetical is the only stable, explainable order it can
+  // offer.
+  const sortedKeys = [...passkeys].sort(
+    (a, b) => a.rpId.localeCompare(b.rpId) || a.user.localeCompare(b.user),
+  );
+  const totalListPages = Math.ceil(sortedKeys.length / KEYS_PER_PAGE);
+  const pagedKeys = sortedKeys.slice(listPage * KEYS_PER_PAGE, (listPage + 1) * KEYS_PER_PAGE);
+
+  const header = (title: string, back?: () => void, right?: ReactNode) => (
+    <div className="h-[45px] px-5 flex items-center justify-between border-b-2 border-black flex-shrink-0">
       {back ? (
         <button onClick={back} className="flex items-center gap-2 active:scale-95 transition-transform">
           <ChevronLeft className="w-5 h-5 text-black" strokeWidth={2.5} />
@@ -90,6 +143,7 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
       ) : (
         <span className="text-lg font-bold text-black uppercase tracking-wide">{title}</span>
       )}
+      {right}
     </div>
   );
 
@@ -114,6 +168,9 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
               },
               ...prev,
             ]);
+            // Land back on the first page so the reviewer starts from a known
+            // spot (the new key sorts into alphabetical position).
+            setListPage(0);
           }
           // Sign-in leaves the stored credential unchanged — the device keeps
           // no per-use state (no timestamps, no exposed counter).
@@ -275,6 +332,9 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
             <button
               onClick={() => {
                 setPasskeys(prev => prev.filter(p => p.id !== selected.id));
+                // Deleting may empty the last page — clamp so the list never
+                // lands on a blank page.
+                setListPage(p => Math.min(p, Math.max(0, Math.ceil((passkeys.length - 1) / KEYS_PER_PAGE) - 1)));
                 setSelectedId(null);
                 setView('list');
               }}
@@ -343,7 +403,9 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
   return (
     <div className="w-[400px] h-[600px] bg-[#838383] flex flex-col">
       <PageDebugId page="passkey" subPage="list" showDebugId={showDebugId} />
-      {header('Passkey', onBack)}
+      {header('Passkey', onBack, totalListPages > 1 ? (
+        <span className="text-lg font-bold text-black tabular-nums">{listPage + 1}/{totalListPages}</span>
+      ) : undefined)}
       <div className="flex-1 py-4 px-5 flex flex-col min-h-0">
         {/* Status — flat field */}
         <div className="mb-4">
@@ -353,10 +415,28 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
           <div className="text-2xl font-normal text-black">FIDO2 · {passkeys.length} of {MAX_PASSKEYS} passkeys</div>
         </div>
 
-        {/* Registered passkeys — interactive menu cards */}
+        {passkeys.length === 0 ? (
+          /* Empty state — what this feature is for and how to get a first key.
+             Dashed border = decorative tip card (CONSTRAINTS § 3.3). */
+          <div className="flex-1 flex flex-col items-center justify-center text-center min-h-0">
+            <KeyRound className="w-12 h-12 text-black mb-3" strokeWidth={1.5} />
+            <div className="text-xl font-bold text-black uppercase tracking-wide mb-2">No Passkeys Yet</div>
+            <p className="text-lg text-black leading-snug mb-3">
+              Use this device as a FIDO2 security key: passwordless sign-in, approved here with fingerprint or PIN.
+            </p>
+            <div className="border-2 border-black border-dashed rounded-sm p-3 text-left">
+              <p className="text-lg text-black leading-snug">
+                GitHub, Google and major exchanges (Binance, Coinbase, Kraken) support passkeys. Add one in the site's Security settings, then confirm on this device.
+              </p>
+            </div>
+          </div>
+        ) : (
+        <>
+        {/* Registered passkeys — interactive menu cards, paged whole
+            (Sign History pattern: 4 per page, alphabetical by rp.id). */}
         <div className={LABEL}>Registered Passkeys</div>
         <div className="space-y-2.5">
-          {passkeys.map(pk => (
+          {pagedKeys.map(pk => (
             <button
               key={pk.id}
               onClick={() => { setSelectedId(pk.id); setView('detail'); }}
@@ -372,21 +452,62 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
           ))}
         </div>
 
-        {/* Demo triggers — stand-ins for requests arriving over BLE/NFC/USB. */}
+        {/* Pagination — boundary buttons hide entirely (CONSTRAINTS § 3.2). */}
+        {totalListPages > 1 && (
+          <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t-2 border-black">
+            {listPage > 0 && (
+              <button
+                onClick={() => setListPage(p => Math.max(0, p - 1))}
+                className="flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] active:scale-95 transition-all flex items-center justify-center gap-2 font-bold text-lg uppercase tracking-wide"
+              >
+                <ChevronUp className="w-4 h-4" strokeWidth={2.5} />
+                Prev
+              </button>
+            )}
+            {listPage < totalListPages - 1 && (
+              <button
+                onClick={() => setListPage(p => Math.min(totalListPages - 1, p + 1))}
+                className="flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] active:scale-95 transition-all flex items-center justify-center gap-2 font-bold text-lg uppercase tracking-wide"
+              >
+                Next
+                <ChevronDown className="w-4 h-4" strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
+        )}
+        </>
+        )}
+
+        {/* Demo triggers — stand-ins for requests arriving over BLE/NFC/USB.
+            Clear empties the store so the empty state is previewable; Sign-In
+            is disabled (invisible label, § 3.1) when there is no credential
+            to sign with. */}
         <div className="mt-auto">
           <div className={LABEL}>Demo · Incoming Requests</div>
           <div className="flex gap-2.5">
             <button
               onClick={() => setView('auth')}
-              className="flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] active:scale-95 transition-all font-bold text-lg uppercase tracking-wide"
+              disabled={passkeys.length === 0}
+              className={`flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] font-bold text-lg uppercase tracking-wide ${
+                passkeys.length === 0 ? 'cursor-default' : 'hover:bg-black hover:text-[#838383] active:scale-95 transition-all'
+              }`}
             >
-              Sign-In
+              <span className={passkeys.length === 0 ? 'invisible' : ''}>Sign-In</span>
             </button>
             <button
               onClick={() => setView('register')}
               className="flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] active:scale-95 transition-all font-bold text-lg uppercase tracking-wide"
             >
               Register
+            </button>
+            <button
+              onClick={() => { setPasskeys([]); setListPage(0); }}
+              disabled={passkeys.length === 0}
+              className={`flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] font-bold text-lg uppercase tracking-wide ${
+                passkeys.length === 0 ? 'cursor-default' : 'hover:bg-black hover:text-[#838383] active:scale-95 transition-all'
+              }`}
+            >
+              <span className={passkeys.length === 0 ? 'invisible' : ''}>Clear</span>
             </button>
           </div>
         </div>
