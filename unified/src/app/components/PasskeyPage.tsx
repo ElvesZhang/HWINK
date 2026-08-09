@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, X, Trash2, KeyRound } from 'lucide-react';
 import { PageDebugId } from './PageDebugId';
 import { FingerprintVerifyPage } from './FingerprintVerifyPage';
@@ -106,12 +106,22 @@ type View = 'list' | 'detail' | 'delete' | 'register' | 'auth' | 'verify' | 'suc
 
 const LABEL = 'text-lg font-light text-black uppercase tracking-wide leading-none mb-1.5';
 
+/** Dev-only command from PasskeyDemoSwitcher; `nonce` re-fires a repeat. */
+export type PasskeyDemoCommand = {
+  action: 'auth' | 'register' | 'clear' | 'restore';
+  nonce: number;
+};
+
 interface PasskeyPageProps {
   onBack: () => void;
   showDebugId?: boolean;
+  /** Dev-only: incoming request / store command from the floating switcher. */
+  demoCommand?: PasskeyDemoCommand | null;
+  /** Reports the credential count so the switcher can enable/disable actions. */
+  onKeyCountChange?: (count: number) => void;
 }
 
-export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
+export function PasskeyPage({ onBack, showDebugId, demoCommand, onKeyCountChange }: PasskeyPageProps) {
   const [passkeys, setPasskeys] = useState<Passkey[]>(INITIAL_PASSKEYS);
   const [view, setView] = useState<View>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -119,6 +129,20 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
   const [pending, setPending] = useState<'register' | 'auth' | null>(null);
   /** List pagination (whole cards, Sign History pattern). */
   const [listPage, setListPage] = useState(0);
+
+  // Apply dev commands (the device itself never originates these — on real
+  // hardware the requests arrive over BLE/NFC/USB).
+  useEffect(() => {
+    if (!demoCommand) return;
+    switch (demoCommand.action) {
+      case 'auth': setView('auth'); break;
+      case 'register': setView('register'); break;
+      case 'clear': setPasskeys([]); setListPage(0); setSelectedId(null); setView('list'); break;
+      case 'restore': setPasskeys(INITIAL_PASSKEYS); setListPage(0); setView('list'); break;
+    }
+  }, [demoCommand?.nonce]);
+
+  useEffect(() => { onKeyCountChange?.(passkeys.length); }, [passkeys.length]);
   /** Which credential an auth request uses (first one in the demo). */
   const authKey = passkeys[0];
   const selected = passkeys.find(p => p.id === selectedId) || null;
@@ -477,40 +501,6 @@ export function PasskeyPage({ onBack, showDebugId }: PasskeyPageProps) {
         )}
         </>
         )}
-
-        {/* Demo triggers — stand-ins for requests arriving over BLE/NFC/USB.
-            Clear empties the store so the empty state is previewable; Sign-In
-            is disabled (invisible label, § 3.1) when there is no credential
-            to sign with. */}
-        <div className="mt-auto">
-          <div className={LABEL}>Demo · Incoming Requests</div>
-          <div className="flex gap-2.5">
-            <button
-              onClick={() => setView('auth')}
-              disabled={passkeys.length === 0}
-              className={`flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] font-bold text-lg uppercase tracking-wide ${
-                passkeys.length === 0 ? 'cursor-default' : 'hover:bg-black hover:text-[#838383] active:scale-95 transition-all'
-              }`}
-            >
-              <span className={passkeys.length === 0 ? 'invisible' : ''}>Sign-In</span>
-            </button>
-            <button
-              onClick={() => setView('register')}
-              className="flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] hover:bg-black hover:text-[#838383] active:scale-95 transition-all font-bold text-lg uppercase tracking-wide"
-            >
-              Register
-            </button>
-            <button
-              onClick={() => { setPasskeys([]); setListPage(0); }}
-              disabled={passkeys.length === 0}
-              className={`flex-1 h-12 border-2 border-black rounded-sm bg-[#838383] font-bold text-lg uppercase tracking-wide ${
-                passkeys.length === 0 ? 'cursor-default' : 'hover:bg-black hover:text-[#838383] active:scale-95 transition-all'
-              }`}
-            >
-              <span className={passkeys.length === 0 ? 'invisible' : ''}>Clear</span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

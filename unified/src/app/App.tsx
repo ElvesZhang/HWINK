@@ -23,7 +23,8 @@ import { DownloadAppPage } from './components/DownloadAppPage';
 import { ResetDevicePage } from './components/ResetDevicePage';
 import { SignatureHistoryPage } from './components/SignatureHistoryPage';
 import { SignRequestPage } from './components/SignRequestPage';
-import { PasskeyPage } from './components/PasskeyPage';
+import { PasskeyPage, type PasskeyDemoCommand } from './components/PasskeyPage';
+import { PasskeyDemoSwitcher } from './components/PasskeyDemoSwitcher';
 import { SignTestPage } from './components/SignTestPage';
 import { DebugPanel } from './components/DebugPanel';
 import type { SignType } from './components/DebugPanel';
@@ -101,6 +102,13 @@ export default function App() {
   const [firmwareBatteryOk, setFirmwareBatteryOk] = useState(true);
   const [firmwareConnect, setFirmwareConnect] = useState<FirmwareConnect>('success');
   const [firmwareOutcome, setFirmwareOutcome] = useState<FirmwareOutcome>('success');
+
+  // Passkey dev switcher: incoming-request / store commands live outside the
+  // device frame (real hardware receives them over BLE/NFC/USB).
+  const [passkeyDemo, setPasskeyDemo] = useState<PasskeyDemoCommand | null>(null);
+  const [passkeyCount, setPasskeyCount] = useState(0);
+  const sendPasskeyDemo = (action: PasskeyDemoCommand['action']) =>
+    setPasskeyDemo(prev => ({ action, nonce: (prev?.nonce ?? 0) + 1 }));
   
   // Zoom State (100% = normal, 40% ≈ 3-inch physical size)
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -259,7 +267,7 @@ export default function App() {
           />
         );
       case 'passkey':
-        return <PasskeyPage onBack={() => setCurrentPage('home')} showDebugId={showDebugId} />;
+        return <PasskeyPage onBack={() => setCurrentPage('home')} showDebugId={showDebugId} demoCommand={passkeyDemo} onKeyCountChange={setPasskeyCount} />;
       case 'sandbox':
         return (
           <SandboxPage
@@ -413,6 +421,17 @@ export default function App() {
       {/* Second-factor (fingerprint vs PIN) toggle - Only on Sign Request page */}
       {effectivePage === 'sign-request' && (
         <SecondFactorToggle enrolled={fingerprintEnrolled} onChange={(v) => { setFingerprintEnrolled(v); setFingerprintPrompted(false); }} />
+      )}
+
+      {/* Passkey demo triggers — incoming requests + store control */}
+      {effectivePage === 'passkey' && (
+        <PasskeyDemoSwitcher
+          hasKeys={passkeyCount > 0}
+          onSignIn={() => sendPasskeyDemo('auth')}
+          onRegister={() => sendPasskeyDemo('register')}
+          onClear={() => sendPasskeyDemo('clear')}
+          onRestore={() => sendPasskeyDemo('restore')}
+        />
       )}
 
       {/* Firmware Update sim toggles (version check + battery + 2nd factor + outcome) */}
