@@ -1,0 +1,40 @@
+# 可选：Ollama + Open WebUI 网页聊天界面
+# 用法: docker compose up -d  然后浏览器打开 http://localhost:3000
+#
+# 如果你已经在本机装好了 Ollama（用 setup.sh / setup.ps1），
+# 可以只启动 webui 服务: docker compose up -d open-webui
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    # 有 NVIDIA 显卡并装好 nvidia-container-toolkit 的话，取消下面注释启用 GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"
+    environment:
+      # 容器内的 webui 连宿主机/容器里的 Ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - open-webui-data:/app/backend/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama-data:
+  open-webui-data:
